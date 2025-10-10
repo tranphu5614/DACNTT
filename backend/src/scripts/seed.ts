@@ -1,39 +1,43 @@
-import 'reflect-metadata';
-import * as dotenv from 'dotenv';
-dotenv.config();
-import * as bcrypt from 'bcrypt';
+import 'dotenv/config';
 import mongoose from 'mongoose';
+import { Schema } from 'mongoose';
+import * as bcrypt from 'bcrypt';
 
-async function seed() {
-  const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/company_requests';
-  await mongoose.connect(MONGO_URI);
+// Định nghĩa schema đơn giản giống với UserSchema
+const UserSchema = new Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true },
+  roles: { type: [String], default: ['user'] },
+}, { timestamps: true });
 
-  const userSchema = new mongoose.Schema({
-    email: { type: String, unique: true, required: true, lowercase: true, trim: true },
-    name: { type: String, required: true },
-    password: { type: String, required: true },
-    roles: { type: [String], required: true }
-  });
+const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/irs_db';
 
-  const User = mongoose.model('User', userSchema);
+async function main() {
+  await mongoose.connect(uri);
+  const User = mongoose.model('User', UserSchema);
 
-  const users = [
-    { email: process.env.ADMIN_EMAIL || 'admin@example.com', name: 'System Admin', roles: ['ADMIN'], password: process.env.ADMIN_PASSWORD || 'Admin@123' },
-    { email: 'hr@example.com', name: 'HR Manager', roles: ['HR_MANAGER'], password: 'Hr@123456' },
-    { email: 'it@example.com', name: 'IT Manager', roles: ['IT_MANAGER'], password: 'It@123456' },
-    { email: 'emp@example.com', name: 'Employee', roles: ['EMPLOYEE'], password: 'Emp@123456' },
-  ];
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@company.com';
+  const adminPass  = process.env.SEED_ADMIN_PASSWORD || 'Admin@123';
 
-  for (const u of users) {
-    const existed = await User.findOne({ email: u.email });
-    if (existed) { console.log('Existed:', u.email); continue; }
-    const hashed = await bcrypt.hash(u.password, 10);
-    await User.create({ ...u, password: hashed });
-    console.log('Created:', u.email, u.roles);
+  const existed = await User.findOne({ email: adminEmail.toLowerCase() });
+  if (existed) {
+    console.log('Admin existed:', adminEmail);
+  } else {
+    const hash = await bcrypt.hash(adminPass, 10);
+    await User.create({
+      name: 'System Admin',
+      email: adminEmail.toLowerCase(),
+      password: hash,
+      roles: ['admin'],
+    });
+    console.log('Seeded admin:', adminEmail, 'password:', adminPass);
   }
 
   await mongoose.disconnect();
-  console.log('✅ Seed done');
 }
 
-seed().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

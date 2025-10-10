@@ -1,33 +1,35 @@
-import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Header from './components/Header';
+import RequireAdmin from './routes/RequireAdmin';
+import AdminUsersPage from './pages/AdminUsersPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import Dashboard from './pages/Dashboard';
 import ProfilePage from './pages/ProfilePage';
-import NotFound from './pages/NotFound';
-import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
   return (
     <>
-      <Navbar />
-      <Routes>
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Dashboard />} />
+      <Header />
+      <main className="container">
+        <Routes>
+          {/* Không có HomePage -> redirect "/" sang /login (hoặc /profile nếu bạn muốn) */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-        </Route>
 
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+          {/* Chỉ admin */}
+          <Route
+            path="/admin/users"
+            element={
+              <RequireAdmin>
+                <AdminUsersPage />
+              </RequireAdmin>
+            }
+          />
 
-        {/* Admin-only ví dụ (mở khi cần) */}
-        {/* <Route element={<ProtectedRoute roles={['admin']} />}>
-          <Route path="/admin" element={<AdminPage />} />
-        </Route> */}
-
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          <Route path="*" element={<div>Not found</div>} />
+        </Routes>
+      </main>
     </>
   );
 }
