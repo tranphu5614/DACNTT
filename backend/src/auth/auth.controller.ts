@@ -1,18 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { Body, Controller, ForbiddenException, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
-
-class RegisterDto {
-  @IsEmail()
-  email!: string;
-
-  @IsString()
-  name!: string;
-
-  @IsString()
-  @MinLength(6)
-  password!: string;
-}
+import { IsEmail, IsString, MinLength } from 'class-validator';
 
 class LoginDto {
   @IsEmail()
@@ -25,15 +13,15 @@ class LoginDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private auth: AuthService) {}
-
-  @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.auth.register(body);
-  }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  login(@Body() body: LoginDto) {
-    return this.auth.login(body);
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.email, dto.password);
+  }
+
+  @Post('register')
+  registerDisabled() {
+    throw new ForbiddenException('Self-registration is disabled');
   }
 }

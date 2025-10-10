@@ -1,14 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { LoginResponse, User } from '../types';
-import { apiLogin, apiRegister } from '../api/auth';
-import { apiMe } from '../api/users';
+import { apiLogin, apiMe } from '../api/auth'; // ✅ gộp vào 1 file
 
 type AuthCtx = {
   user: User | null;
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshMe: () => Promise<void>;
   hasRole: (role: string) => boolean;
@@ -23,12 +21,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(LS_TOKEN));
   const [user, setUser] = useState<User | null>(() => {
     const s = localStorage.getItem(LS_USER);
-    return s ? JSON.parse(s) as User : null;
+    return s ? (JSON.parse(s) as User) : null;
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Khi có token mà chưa có user hoặc muốn đồng bộ, gọi /users/me
     const bootstrap = async () => {
       if (token && !user) {
         setLoading(true);
@@ -37,7 +34,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(me);
           localStorage.setItem(LS_USER, JSON.stringify(me));
         } catch {
-          // token sai/hết hạn
           localStorage.removeItem(LS_TOKEN);
           localStorage.removeItem(LS_USER);
           setToken(null);
@@ -55,21 +51,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const res: LoginResponse = await apiLogin(email, password);
+      // LoginResponse cần có: { accessToken: string; user: User }
       setToken(res.accessToken);
       setUser(res.user);
       localStorage.setItem(LS_TOKEN, res.accessToken);
       localStorage.setItem(LS_USER, JSON.stringify(res.user));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const register = async (name: string, email: string, password: string) => {
-    setLoading(true);
-    try {
-      await apiRegister(name, email, password);
-      // Sau khi đăng ký, đăng nhập luôn cho tiện
-      await login(email, password);
     } finally {
       setLoading(false);
     }
@@ -91,9 +77,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasRole = (role: string) => !!user?.roles?.includes(role);
 
-  const value = useMemo<AuthCtx>(() => ({
-    user, token, loading, login, register, logout, refreshMe, hasRole
-  }), [user, token, loading]);
+  const value = useMemo<AuthCtx>(
+    () => ({ user, token, loading, login, logout, refreshMe, hasRole }),
+    [user, token, loading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

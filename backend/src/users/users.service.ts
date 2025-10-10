@@ -1,32 +1,51 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User, UserDocument, Role } from './user.schema';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from './dto/create-user.dto';
+import { Role, User, UserDocument } from './schemas/user.schema';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+  ) {}
 
-  async create(data: { email: string; name: string; password: string; roles?: Role[] }) {
-    const hashed = await bcrypt.hash(data.password, 10);
-    const doc = new this.userModel({ ...data, password: hashed });
-    await doc.save();
-    const obj = doc.toObject();
-    delete (obj as any).password; // vì select:false nhưng xoá cho chắc
-    return obj;
-  }
-
-  async findByEmail(email: string, includePassword = false): Promise<UserDocument | null> {
-    const q = this.userModel.findOne({ email });
-    return includePassword ? q.select('+password').exec() : q.exec();
+  async findByEmail(email: string) {
+    return this.userModel
+      .findOne({ email })
+      .lean<User & { _id: Types.ObjectId } | null>();
   }
 
   async findById(id: string) {
-    return this.userModel.findById(id).exec();
+    if (!Types.ObjectId.isValid(id)) return null;
+    return this.userModel
+      .findById(id)
+      .lean<User & { _id: Types.ObjectId } | null>();
   }
 
-  async updateRoles(id: string, roles: Role[]) {
-    return this.userModel.findByIdAndUpdate(id, { roles }, { new: true }).exec();
+  async createByAdmin(dto: CreateUserDto) {
+    const exists = await this.userModel.exists({ email: dto.email });
+    if (exists) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const roles: Role[] = dto.roles?.length ? dto.roles : [Role.USER];
+
+    const doc = await this.userModel.create({
+      name: dto.name,
+      email: dto.email,
+      password: passwordHash,
+      roles,
+    });
+
+    const obj = doc.toObject() as User & {
+      _id: Types.ObjectId;
+      password?: string;
+    };
+    const { password, ...rest } = obj; // loại password
+    return { ...rest, _id: rest._id.toString() };
   }
 }

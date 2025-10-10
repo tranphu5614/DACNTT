@@ -1,16 +1,13 @@
-import { LoginResponse } from '../types';
-import { request } from './client';
+import { LoginResponse, User } from '../types';
+import { request } from './request';
 
 export function apiLogin(email: string, password: string) {
   return request<LoginResponse>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password }),
   });
 }
 
-export function apiRegister(name: string, email: string, password: string) {
-  return request<{ _id: string; email: string; name: string; roles: string[] }>(
-    '/auth/register',
-    { method: 'POST', body: JSON.stringify({ name, email, password }) }
-  );
+export function apiMe(token: string) {
+  return request<User>('/users/me', { method: 'GET' }, token);
 }
