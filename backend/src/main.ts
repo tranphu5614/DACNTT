@@ -5,13 +5,13 @@ dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cors from 'cors';
-
 import { ValidationPipe } from '@nestjs/common';
+import * as express from 'express';
+import { join } from 'path';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
 
-  // CORS cho local dev (Vite, v.v.)
   app.use(cors({
     origin: [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/],
     credentials: true,
@@ -19,7 +19,8 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization']
   }));
 
-  // Bật validation cho DTO
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads'))); // 👈 serve file đính kèm
+
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const port = process.env.PORT || 3000;

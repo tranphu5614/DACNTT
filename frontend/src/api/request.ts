@@ -5,26 +5,44 @@ export async function request<T>(
   options: RequestInit = {},
   token?: string
 ): Promise<T> {
-  // Dùng Headers để thao tác an toàn
   const headers = new Headers(options.headers);
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+
+  const isFormData =
+    typeof FormData !== 'undefined' && options.body instanceof FormData;
+
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_URL}${path}`, {
+    cache: 'no-store',
+    ...options,
+    headers,
+  });
 
-  const text = await res.text();
+  const text = await res.text().catch(() => '');
   const data = text ? safeJson(text) : null;
 
   if (!res.ok) {
     const message =
-      (data && (data.message || data.error)) ||
+      (data && ((data as any).message || (data as any).error)) ||
       res.statusText ||
       'Request error';
-    throw new Error(Array.isArray(message) ? message.join(', ') : String(message));
+    const msg = Array.isArray(message) ? message.join(', ') : String(message || '');
+    throw new Error(`[${res.status}] ${msg}`.trim());
   }
+
   return data as T;
 }
 
 function safeJson(text: string) {
-  try { return JSON.parse(text); } catch { return text; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
