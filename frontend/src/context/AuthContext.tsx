@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { LoginResponse, User } from '../types';
-import { apiLogin, apiMe } from '../api/auth'; // ✅ gộp vào 1 file
+import { apiLogin, apiMe } from '../api/auth';
 
 type AuthCtx = {
   user: User | null;
@@ -12,81 +12,67 @@ type AuthCtx = {
   hasRole: (role: string) => boolean;
 };
 
-const AuthContext = createContext<AuthCtx | undefined>(undefined);
-
-const LS_TOKEN = 'irs_token';
-const LS_USER = 'irs_user';
+const Ctx = createContext<AuthCtx>({
+  user: null,
+  token: null,
+  loading: false,
+  login: async () => {},
+  logout: () => {},
+  refreshMe: async () => {},
+  hasRole: () => false,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(LS_TOKEN));
-  const [user, setUser] = useState<User | null>(() => {
-    const s = localStorage.getItem(LS_USER);
-    return s ? (JSON.parse(s) as User) : null;
-  });
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const bootstrap = async () => {
-      if (token && !user) {
-        setLoading(true);
-        try {
-          const me = await apiMe(token);
-          setUser(me);
-          localStorage.setItem(LS_USER, JSON.stringify(me));
-        } catch {
-          localStorage.removeItem(LS_TOKEN);
-          localStorage.removeItem(LS_USER);
-          setToken(null);
-          setUser(null);
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-    bootstrap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const saveToken = (t: string | null) => {
+    setToken(t);
+    if (t) localStorage.setItem('token', t);
+    else localStorage.removeItem('token');
+  };
+
+  const refreshMe = async () => {
+    if (!token) { setUser(null); return; }
+    try {
+      const me = await apiMe(token);
+      setUser(me || null);
+    } catch {
+      setUser(null);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
       const res: LoginResponse = await apiLogin(email, password);
-      // LoginResponse cần có: { accessToken: string; user: User }
-      setToken(res.accessToken);
+      saveToken(res.accessToken);
       setUser(res.user);
-      localStorage.setItem(LS_TOKEN, res.accessToken);
-      localStorage.setItem(LS_USER, JSON.stringify(res.user));
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
-    setToken(null);
+    saveToken(null);
     setUser(null);
-    localStorage.removeItem(LS_TOKEN);
-    localStorage.removeItem(LS_USER);
   };
 
-  const refreshMe = async () => {
-    if (!token) return;
-    const me = await apiMe(token);
-    setUser(me);
-    localStorage.setItem(LS_USER, JSON.stringify(me));
+  useEffect(() => { refreshMe(); /* eslint-disable-line */ }, [token]);
+
+  const hasRole = (r: string) => {
+    const want = String(r).toUpperCase();
+    const mine = (user?.roles ?? []).map((x) => String(x).toUpperCase());
+    return mine.includes(want);
   };
 
-  const hasRole = (role: string) => !!user?.roles?.includes(role);
-
-  const value = useMemo<AuthCtx>(
+  const value = useMemo(
     () => ({ user, token, loading, login, logout, refreshMe, hasRole }),
     [user, token, loading]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within <AuthProvider>');
-  return ctx;
-}
+export const useAuth = () => useContext(Ctx);

@@ -12,31 +12,22 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
-    const user = await this.users.findByEmail(email.toLowerCase());
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    const user = await this.users.findByEmail(email);
+    if (!user) throw new UnauthorizedException('Invalid email or password');
 
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
+    const ok = await bcrypt.compare(password, (user as any).password || '');
+    if (!ok) throw new UnauthorizedException('Invalid email or password');
 
-    const payload = { sub: user._id.toString(), email: user.email, roles: user.roles };
+    const payload = {
+      sub: (user as any)._id?.toString?.() || (user as any)._id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles || [],
+    };
     const accessToken = await this.jwt.signAsync(payload);
 
-    return {
-      accessToken,
-      user: this.toSafeUser(user),
-    };
-  }
-
-  private toSafeUser(u: User & { _id: any }) {
-    return {
-      _id: u._id.toString(),
-      name: u.name,
-      email: u.email,
-      roles: u.roles ?? [],
-    };
+    // Ẩn password khi trả về
+    const { password: _, ...safeUser } = user as any;
+    return { accessToken, user: { ...safeUser, _id: payload.sub } as User };
   }
 }

@@ -2,114 +2,88 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { apiCreateUser } from '../api/users';
 
+const ALL_ROLES = ['USER', 'ADMIN', 'IT_MANAGER', 'HR_MANAGER'] as const;
+
 export default function AdminUsersPage() {
   const { token } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rolesStr, setRolesStr] = useState('user'); // mặc định user
+  const [chosen, setChosen] = useState<string[]>(['USER']);
   const [msg, setMsg] = useState<string>('');
   const [err, setErr] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const toggleRole = (r: string) => {
+    setChosen((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMsg('');
-    setErr('');
-
-    // cắt trắng & đảm bảo là string
-    const payload = {
-      name: String(name).trim(),
-      email: String(email).trim(),
-      password: String(password),
-      roles: rolesStr
-        .split(',')
-        .map((r) => r.trim())
-        .filter(Boolean),
-    };
-
-    if (!payload.name) {
-      setErr('Tên không được để trống');
-      return;
-    }
-    if (!token) {
-      setErr('Chưa có token admin');
-      return;
-    }
-
+    setMsg(''); setErr('');
     try {
       setLoading(true);
-      await apiCreateUser(token, payload);
-      setMsg('Tạo user thành công!');
-      // clear form
-      setName('');
-      setEmail('');
-      setPassword('');
-      setRolesStr('user');
+      await apiCreateUser(token!, {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        roles: chosen,
+      });
+      setMsg('Tạo user thành công');
+      setName(''); setEmail(''); setPassword(''); setChosen(['USER']);
     } catch (e: any) {
-      setErr(e?.message || 'Tạo user thất bại');
+      setErr(e?.message || 'Create failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="page">
-      <h1>Quản trị: Tạo nhân viên</h1>
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h4 className="card-title mb-3">Create user</h4>
 
-      {msg && <div className="callout success">{msg}</div>}
-      {err && <div className="error">{err}</div>}
+        {msg && <div className="alert alert-success">{msg}</div>}
+        {err && <div className="alert alert-danger">{err}</div>}
 
-      <form onSubmit={handleSubmit} style={{ maxWidth: 520 }}>
-        <div className="form-group">
-          <label>Tên</label>
-          <input
-            type="text"
-            value={name}
-            placeholder="Nguyễn Văn A"
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </div>
+        <form onSubmit={onSubmit} className="row g-3">
+          <div className="col-md-6">
+            <label className="form-label">Name</label>
+            <input className="form-control" placeholder="Nguyễn Văn A" value={name}
+                   onChange={(e) => setName(e.target.value)} required />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label">Email</label>
+            <input className="form-control" type="email" placeholder="a.nguyen@company.com" value={email}
+                   onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label">Password</label>
+            <input className="form-control" type="password" placeholder="Tối thiểu 6 ký tự"
+                   value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
+          </div>
 
-        <div className="form-group">
-          <label>Email</label>
-          <input
-            type="email"
-            value={email}
-            placeholder="a@company.com"
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
+          <div className="col-12">
+            <label className="form-label">Roles</label>
+            <div className="d-flex flex-wrap gap-3">
+              {ALL_ROLES.map((r) => (
+                <div className="form-check" key={r}>
+                  <input className="form-check-input" type="checkbox" id={`role-${r}`}
+                         checked={chosen.includes(r)} onChange={() => toggleRole(r)} />
+                  <label className="form-check-label" htmlFor={`role-${r}`}>{r}</label>
+                </div>
+              ))}
+            </div>
+            <div className="form-text">Mặc định sẽ có USER.</div>
+          </div>
 
-        <div className="form-group">
-          <label>Mật khẩu</label>
-          <input
-            type="password"
-            value={password}
-            placeholder=">= 6 ký tự"
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Roles (phân cách bằng dấu phẩy)</label>
-          <input
-            type="text"
-            value={rolesStr}
-            placeholder="user, it_manager, hr_manager, admin"
-            onChange={(e) => setRolesStr(e.target.value)}
-          />
-          <small>Giá trị hợp lệ: <code>user</code>, <code>admin</code>, <code>it_manager</code>, <code>hr_manager</code></small>
-        </div>
-
-        <button type="submit" disabled={loading}>
-          {loading ? 'Đang tạo…' : 'Tạo user'}
-        </button>
-      </form>
+          <div className="col-12 d-grid">
+            <button className="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Đang tạo…' : 'Tạo user'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

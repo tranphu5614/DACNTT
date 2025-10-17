@@ -15,25 +15,55 @@ export default function LoginPage() {
     setErr('');
     try {
       await login(email, password);
-      const to = loc.state?.from?.pathname || '/';
+      const to = loc?.state?.from?.pathname || '/profile';
       nav(to, { replace: true });
     } catch (e: any) {
-      setErr(e.message || 'Login failed');
+      setErr(e?.message || 'Login failed');
     }
   };
 
   return (
-    <div className="center">
-      <form className="card" onSubmit={onSubmit}>
-        <h2>Login</h2>
-        <label>Email</label>
-        <input value={email} onChange={e=>setEmail(e.target.value)} type="email" required />
-        <label>Password</label>
-        <input value={password} onChange={e=>setPassword(e.target.value)} type="password" required />
-        {err && <div className="error">{err}</div>}
-        <button type="submit" disabled={loading}>{loading ? '...' : 'Login'}</button>
-        <p className="muted"></p>
-      </form>
+    <div className="card shadow-sm">
+      <div className="card-body">
+        <h4 className="card-title mb-1">Welcome back</h4>
+        <p className="text-secondary">Đăng nhập để tiếp tục</p>
+
+        {err && <div className="alert alert-danger">{err}</div>}
+
+        <form onSubmit={onSubmit} className="row g-3">
+          <div className="col-12">
+            <label className="form-label">Email</label>
+            <input
+              className="form-control"
+              type="email"
+              placeholder="you@company.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div className="col-12">
+            <label className="form-label">Password</label>
+            <input
+              className="form-control"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+          </div>
+
+          <div className="col-12 d-grid">
+            <button className="btn btn-primary" type="submit" disabled={loading}>
+              {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

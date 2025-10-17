@@ -2,12 +2,19 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasRole } = useAuth();
+
   return (
     <nav className="nav">
       <div className="nav-left">
         <Link to="/" className="brand">Internal Request</Link>
-        <Link to="/profile">Profile</Link>
+        {user && <Link to="/profile">Profile</Link>}
+        {user && hasRole && hasRole('ADMIN') && (
+          <>
+            <Link to="/admin/users">Users</Link>
+            <Link to="/admin/users/create">Create User</Link>
+          </>
+        )}
       </div>
       <div className="nav-right">
         {user ? (

@@ -5,11 +5,21 @@ export interface User {
   email: string;
   name: string;
   roles: Role[];
+  // createdAt/updatedAt có thể tồn tại từ backend timestamps
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginResponse {
   accessToken: string;
   user: User;
+}
+
+export interface PageResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 export interface ApiError {
