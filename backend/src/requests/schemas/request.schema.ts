@@ -1,3 +1,4 @@
+// backend/src/requests/schemas/request.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -5,27 +6,46 @@ export type RequestDocument = Request & Document;
 
 @Schema({ timestamps: true })
 export class Request {
-  @Prop({ type: String, enum: ['HR', 'IT'], required: true, index: true })
+  @Prop({ required: true })
   category!: 'HR' | 'IT';
 
-  @Prop({ type: String, required: true })
+  @Prop({ required: true })
   typeKey!: string;
 
-  @Prop({ type: String, required: true })
-  title!: string;
+  @Prop()
+  title?: string;
 
-  @Prop({ type: String, required: true })
-  description!: string;
+  @Prop()
+  description?: string;
 
-  @Prop({ type: String, enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'], required: true })
-  priority!: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  @Prop()
+  priority?: string;
 
-  @Prop({ type: String, enum: ['OPEN', 'IN_PROGRESS', 'DONE', 'REJECTED'], default: 'OPEN', index: true })
-  status!: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'REJECTED';
+  // TRẠNG THÁI YÊU CẦU
+  @Prop({
+    default: 'NEW',
+    enum: ['NEW', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+  })
+  status!: string;
 
   @Prop({ type: Object })
-  custom?: Record<string, any>;
+  custom?: any;
 
+  // Người tạo yêu cầu
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  requester!: Types.ObjectId;
+
+  // --- Đặt phòng (nếu có) ---
+  @Prop()
+  bookingRoomKey?: string;
+
+  @Prop()
+  bookingStart?: Date;
+
+  @Prop()
+  bookingEnd?: Date;
+
+  // --- File đính kèm ---
   @Prop({
     type: [
       {
@@ -37,16 +57,57 @@ export class Request {
     ],
     default: [],
   })
-  attachments?: Array<{
+  attachments?: {
     filename: string;
     path: string;
     size: number;
     mimetype: string;
-  }>;
+  }[];
 
-  // ✅ NGƯỜI TẠO YÊU CẦU (bắt buộc)
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
-  requester!: Types.ObjectId;
+  // --- Quy trình duyệt ---
+  @Prop({
+    default: 'NONE',
+  })
+  approvalStatus!: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+
+  @Prop({ type: Number, default: 0 })
+  currentApprovalLevel!: number;
+
+  @Prop({
+    type: [
+      {
+        level: Number,
+        role: String,
+        approver: { type: Types.ObjectId, ref: 'User' },
+        approvedAt: Date,
+        decision: String,
+        comment: String,
+      },
+    ],
+    default: [],
+  })
+  approvals!: {
+    level: number;
+    role: string;
+    approver?: Types.ObjectId;
+    approvedAt?: Date;
+    decision?: 'APPROVED' | 'REJECTED';
+    comment?: string;
+  }[];
+
+  // =============== PHẦN MỚI  ===============
+
+  // Gợi ý sửa lỗi do AI phân tích
+  @Prop({ type: String })
+  aiSuggestion?: string;
+
+  // Kết quả tự sửa lỗi của người dùng
+  @Prop({
+    type: String,
+    enum: ['FIXED', 'NOT_FIXED', null],
+    default: null,
+  })
+  selfFixResult!: 'FIXED' | 'NOT_FIXED' | null;
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);

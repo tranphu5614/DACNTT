@@ -1,286 +1,492 @@
 // frontend/src/pages/NewRequestPage.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { apiGetCatalog, type CatalogItem } from '../api/catalog';
-import { apiCreateRequest, type RequestCategory, type RequestPriority } from '../api/requests';
-import RequestDynamicFields from '../components/RequestDynamicFields';
+// Sử dụng fetch wrapper của bạn: request.ts + requests.ts (không dùng axios)
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { request as apiRequest } from '../api/request';
+import { apiCreateRequest } from '../api/requests';
+
+type SelectOption = { value: string; label: string };
+
+// ====== Kiểu dữ liệu khớp với backend/src/catalog/catalog.data.ts ======
+type StaticSelectField = {
+  key: string;
+  label: string;
+  type: 'select';
+  required?: boolean;
+  options: SelectOption[];
+};
+
+type DynamicSelectField = {
+  key: string;
+  label: string;
+  type: 'select';
+  required?: boolean;
+  optionsUrlTemplate: string; // ví dụ: /requests/available-rooms?start={custom.start}&end={custom.end}&size={custom.size}
+};
+
+type BaseField =
+  | { key: string; label: string; type: 'text' | 'textarea' | 'date' | 'number' | 'datetime'; required?: boolean };
+
+type CatalogField = BaseField | StaticSelectField | DynamicSelectField;
+
+type CatalogItem = {
+  category: 'HR' | 'IT';
+  typeKey: string;
+  title: string;
+  fields: CatalogField[];
+};
+
+// Trả về từ /requests/available-rooms
+type Room = { key: string; name: string; size: 'SMALL' | 'LARGE' };
 
 export default function NewRequestPage() {
-  const { token } = useAuth();
-
-  // Chọn danh mục/loại
-  const [category, setCategory] = useState<RequestCategory | ''>('');
+  const [token, setToken] = useState<string>('');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [typeKey, setTypeKey] = useState<string>('');
+  const [form, setForm] = useState<{
+    category: 'HR' | 'IT';
+    typeKey: string;
+    title: string;
+    description: string;
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    custom: Record<string, any>;
+  }>({
+    category: 'HR',
+    typeKey: '',
+    title: '',
+    description: '',
+    priority: 'MEDIUM',
+    custom: {},
+  });
 
-  // Trường cơ bản
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<RequestPriority>('LOW');
-
-  // Trường động
-  const [custom, setCustom] = useState<Record<string, any>>({});
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
-
-  // Files
-  const [files, setFiles] = useState<File[]>([]);
-
-  // UI states
+  const [remoteOptions, setRemoteOptions] = useState<Record<string, SelectOption[]>>({});
+  const [loadingRemote, setLoadingRemote] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const canLoadCatalog = useMemo(() => Boolean(token && category), [token, category]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const selectedType: CatalogItem | undefined = useMemo(
-    () => catalog.find((c) => c.typeKey === typeKey),
-    [catalog, typeKey]
+  useEffect(() => {
+    setToken(localStorage.getItem('token') || '');
+  }, []);
+
+  // Helper: build URL từ template (thay {custom.xxx}, {title}, {category}, {typeKey})
+  function buildUrlFromTemplate(tpl: string): string {
+    return tpl.replace(/\{([^}]+)\}/g, (_m, expr: string) => {
+      try {
+        if (expr.startsWith('custom.')) {
+          const k = expr.slice('custom.'.length);
+          return encodeURIComponent(form.custom?.[k] ?? '');
+        }
+        return encodeURIComponent((form as any)[expr] ?? '');
+      } catch {
+        return '';
+      }
+    });
+  }
+
+  // Helper: chuyển datetime-local -> ISO
+  function toISO(v: string): string {
+    return v ? new Date(v).toISOString() : '';
+  }
+
+  const current = useMemo(
+    () => catalog.find((c) => c.typeKey === form.typeKey),
+    [catalog, form.typeKey],
   );
 
-  // Tải catalog khi chọn danh mục
+  // Tải catalog theo category
   useEffect(() => {
-    let aborted = false;
-    async function load() {
-      setCatalog([]);
-      setTypeKey('');
-      setCustom({});
-      setFieldErrors({});
-      setOk(null);
-      setError(null);
+    if (!token) return;
+    let cancelled = false;
 
-      if (!canLoadCatalog) return;
-      setLoading(true);
+    (async () => {
       try {
-        const items = await apiGetCatalog(token!, category as RequestCategory);
-        if (aborted) return;
+        const data = await apiRequest<CatalogItem[]>(
+          `/catalog?category=${form.category}`,
+          { method: 'GET' },
+          token,
+        );
+        if (cancelled) return;
 
-        setCatalog(items);
-        setTypeKey(items[0]?.typeKey ?? '');
-        // reset custom theo fields đầu tiên (nếu có)
-        const first = items[0];
-        if (first?.fields?.length) {
-          const init: Record<string, any> = {};
-          first.fields.forEach((f) => { init[f.key] = ''; });
-          setCustom(init);
+        setCatalog(data || []);
+
+        // Nếu typeKey hiện tại không thuộc category mới -> reset chọn mẫu đầu tiên
+        if (!data?.find((x) => x.typeKey === form.typeKey)) {
+          const first = data?.[0];
+          setForm((old) => ({
+            ...old,
+            typeKey: first?.typeKey ?? '',
+            title: first?.title ?? '',
+            custom: {},
+            description: '',
+          }));
+          setRemoteOptions({});
         }
       } catch (e: any) {
-        if (aborted) return;
-        setError(e?.message ?? 'Không tải được danh mục');
-      } finally {
-        if (!aborted) setLoading(false);
+        setCatalog([]);
+        setMsg({ type: 'error', text: e?.message || 'Không tải được catalog' });
       }
-    }
-    load();
-    return () => { aborted = true; };
-  }, [canLoadCatalog, token, category]);
+    })();
 
-  // Khi đổi typeKey → reset custom theo fields mới
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, form.category]);
+
+  // Fetch options động cho các field có optionsUrlTemplate
   useEffect(() => {
-    if (!selectedType) { setCustom({}); setFieldErrors({}); return; }
-    const init: Record<string, any> = {};
-    selectedType.fields.forEach((f) => { init[f.key] = ''; });
-    setCustom(init);
-    setFieldErrors({});
-  }, [selectedType?.typeKey]);
+    if (!token || !current) return;
+    let cancelled = false;
 
-  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const list = e.target.files ? Array.from(e.target.files) : [];
-    setFiles(list);
-  }
+    const fetchField = async (f: CatalogField) => {
+      if (f.type !== 'select' || !(f as DynamicSelectField).optionsUrlTemplate) return;
 
-  function validate(): boolean {
-    const errs: Record<string, string | undefined> = {};
+      const url = buildUrlFromTemplate((f as DynamicSelectField).optionsUrlTemplate);
 
-    if (!category) {
-      setError('Vui lòng chọn danh mục');
-      return false;
-    }
-    if (!typeKey) {
-      setError('Vui lòng chọn loại');
-      return false;
-    }
-    if (!title.trim()) {
-      setError('Vui lòng nhập tiêu đề');
-      return false;
-    }
-
-    if (selectedType?.fields?.length) {
-      for (const f of selectedType.fields) {
-        const v = custom?.[f.key];
-        if (f.required) {
-          if (f.type === 'select') {
-            if (!v) errs[f.key] = 'Bắt buộc chọn';
-          } else if (v === undefined || v === null || v === '') {
-            errs[f.key] = 'Bắt buộc nhập';
-          }
-        }
+      // Nếu còn placeholder -> chưa đủ dữ liệu
+      if (/\{[^}]+\}/.test(url)) {
+        setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
+        return;
       }
-    }
 
-    setFieldErrors(errs);
-    if (Object.keys(errs).length > 0) {
-      setError('Vui lòng điền đủ các trường bắt buộc');
-      return false;
-    }
-    setError(null);
-    return true;
-  }
+      try {
+        setLoadingRemote((prev) => ({ ...prev, [f.key]: true }));
+        // Với API /requests/available-rooms, kết quả là Room[]
+        const data = await apiRequest<Array<Room | { key?: string; name?: string; value?: string; label?: string }>>(
+          url,
+          { method: 'GET' },
+          token,
+        );
+        if (cancelled) return;
 
-  async function onSubmit(e: React.FormEvent) {
+        // Chuẩn hoá về SelectOption
+        const mapped: SelectOption[] = (data || []).map((d: any) => ({
+          value: String(d.value ?? d.key ?? ''),
+          label: String(d.label ?? d.name ?? d.value ?? d.key ?? ''),
+        }));
+
+        setRemoteOptions((prev) => ({ ...prev, [f.key]: mapped }));
+
+        // Nếu giá trị hiện tại không còn hợp lệ -> reset
+        if (form.custom?.[f.key] && !mapped.find((m) => m.value === form.custom[f.key])) {
+          setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: '' } }));
+        }
+      } catch (err) {
+        setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
+      } finally {
+        setLoadingRemote((prev) => ({ ...prev, [f.key]: false }));
+      }
+    };
+
+    (async () => {
+      for (const f of current.fields) {
+        await fetchField(f);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // phụ thuộc: typeKey + các custom fields ảnh hưởng template (thường: start/end/size)
+  }, [token, current, form.typeKey, form.custom?.start, form.custom?.end, form.custom?.size]); // eslint-disable-line
+
+  // Submit
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOk(null);
+    setMsg(null);
 
     if (!token) {
-      setError('Bạn cần đăng nhập');
+      setMsg({ type: 'error', text: 'Bạn chưa đăng nhập.' });
       return;
     }
-    if (!validate()) return;
 
-    setSubmitting(true);
+    setLoading(true);
+
     try {
+      const normalizedCustom = { ...form.custom };
+      if (normalizedCustom.start) normalizedCustom.start = toISO(normalizedCustom.start);
+      if (normalizedCustom.end) normalizedCustom.end = toISO(normalizedCustom.end);
+
+      const files = fileInputRef.current?.files ? Array.from(fileInputRef.current.files) : [];
+
       await apiCreateRequest(token, {
-        category: category as RequestCategory,
-        typeKey,
-        title: title.trim(),
-        description: description.trim(),
-        priority,
-        custom,            // gửi object; apiCreateRequest sẽ stringify trong FormData
+        category: form.category,
+        typeKey: form.typeKey,
+        title: form.title || current?.title || '',
+        description: form.description || '',
+        priority: form.priority,
+        custom: normalizedCustom,
         files,
       });
-      setOk('Tạo yêu cầu thành công');
-      // reset form (giữ lại category để tiếp tục tạo nhanh)
-      setTitle('');
-      setDescription('');
-      setPriority('LOW');
-      setFiles([]);
-      // reset trường động theo type hiện tại
-      const next: Record<string, any> = {};
-      selectedType?.fields.forEach((f) => { next[f.key] = ''; });
-      setCustom(next);
-    } catch (e: any) {
-      setError(e?.message ?? 'Tạo yêu cầu thất bại');
+
+      setMsg({ type: 'success', text: 'Tạo yêu cầu thành công!' });
+
+      // reset form tối thiểu
+      setForm((old) => ({
+        ...old,
+        title: current?.title ?? '',
+        description: '',
+        custom: {},
+      }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err: any) {
+      const text = err?.message || 'Không thể tạo yêu cầu. Vui lòng thử lại.';
+      setMsg({ type: 'error', text });
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="container py-4">
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h3 className="m-0">Tạo yêu cầu</h3>
+    <div className="container py-3">
+      <h3 className="mb-3">Tạo yêu cầu</h3>
+
+      {/* Alerts */}
+      {msg && (
+        <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} role="alert">
+          {msg.text}
+        </div>
+      )}
+
+      {/* Category */}
+      <div className="mb-3">
+        <label className="form-label">Danh mục</label>
+        <select
+          className="form-select"
+          value={form.category}
+          onChange={(e) =>
+            setForm((old) => ({
+              ...old,
+              category: e.target.value as 'HR' | 'IT',
+              typeKey: '',
+              title: '',
+              custom: {},
+              description: '',
+            }))
+          }
+        >
+          <option value="HR">HR</option>
+          <option value="IT">IT</option>
+        </select>
       </div>
 
-      {ok && <div className="alert alert-success">{ok}</div>}
-      {error && <div className="alert alert-danger">{error}</div>}
+      {/* TypeKey */}
+      <div className="mb-3">
+        <label className="form-label">Loại yêu cầu</label>
+        <select
+          className="form-select"
+          value={form.typeKey}
+          onChange={(e) => {
+            const tk = e.target.value;
+            const found = catalog.find((c) => c.typeKey === tk);
+            setForm((old) => ({
+              ...old,
+              typeKey: tk,
+              title: found?.title ?? '',
+              custom: {},
+            }));
+            setRemoteOptions({});
+          }}
+        >
+          <option value="">-- Chọn --</option>
+          {catalog.map((c) => (
+            <option key={c.typeKey} value={c.typeKey}>
+              {c.title}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <form onSubmit={onSubmit} className="row g-3">
-        {/* Danh mục */}
-        <div className="col-md-4">
-          <label className="form-label">Danh mục</label>
-          <select
-            className="form-select"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as RequestCategory | '')}
-            disabled={submitting}
-          >
-            <option value="">-- chọn --</option>
-            <option value="HR">HR</option>
-            <option value="IT">IT</option>
-          </select>
-        </div>
-
-        {/* Loại */}
-        <div className="col-md-8">
-          <label className="form-label">Loại</label>
-          <select
-            className="form-select"
-            value={typeKey}
-            onChange={(e) => setTypeKey(e.target.value)}
-            disabled={!category || loading || submitting || catalog.length === 0}
-          >
-            {!category && <option>Chọn danh mục trước</option>}
-            {category && catalog.length === 0 && !loading && <option>Không có loại nào</option>}
-            {catalog.map((c) => (
-              <option key={c.typeKey} value={c.typeKey}>{c.title}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Tiêu đề / Mô tả / Ưu tiên */}
-        <div className="col-md-6">
-          <label className="form-label">Tiêu đề</label>
-          <input
-            className="form-control"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={submitting}
-            required
-          />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Ưu tiên</label>
-          <select
-            className="form-select"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as any)}
-            disabled={submitting}
-          >
-            <option value="LOW">Thấp</option>
-            <option value="MEDIUM">Trung bình</option>
-            <option value="HIGH">Cao</option>
-            <option value="URGENT">Khẩn</option>
-          </select>
-        </div>
-        <div className="col-12">
-          <label className="form-label">Mô tả</label>
-          <textarea
-            className="form-control"
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={submitting}
-            required
-          />
-        </div>
-
-        {/* Trường động theo loại */}
-        {selectedType && (
-          <div className="col-12">
-            <div className="border rounded p-3">
-              <div className="mb-2 fw-semibold">Thông tin bổ sung</div>
-              <RequestDynamicFields
-                fields={selectedType.fields}
-                value={custom}
-                onChange={setCustom}
-                disabled={submitting}
-                errors={fieldErrors}
-              />
-            </div>
+      {/* Form fields */}
+      {current && (
+        <form onSubmit={onSubmit}>
+          {/* Title */}
+          <div className="mb-3">
+            <label className="form-label">Tiêu đề</label>
+            <input
+              className="form-control"
+              value={form.title}
+              onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
+              placeholder={current.title}
+            />
           </div>
-        )}
 
-        {/* Files */}
-        <div className="col-12">
-          <label className="form-label">Đính kèm (tối đa 5 file)</label>
-          <input
-            className="form-control"
-            type="file"
-            multiple
-            onChange={onPickFiles}
-            disabled={submitting}
-          />
-          {files.length > 0 && (
-            <div className="form-text">{files.length} file đã chọn</div>
-          )}
-        </div>
+          {current.fields.map((f) => {
+            // SELECT (static / dynamic)
+            if (f.type === 'select') {
+              const dynTpl = (f as DynamicSelectField).optionsUrlTemplate;
+              const isDynamic = typeof dynTpl === 'string' && dynTpl.length > 0;
+              const options: SelectOption[] = isDynamic
+                ? remoteOptions[f.key] || []
+                : (f as StaticSelectField).options;
 
-        <div className="col-12">
-          <button className="btn btn-primary" type="submit" disabled={submitting || !category || !typeKey}>
-            {submitting ? 'Đang tạo...' : 'Tạo yêu cầu'}
+              const isLoading = !!loadingRemote[f.key];
+
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <select
+                    className="form-select"
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                    disabled={isDynamic && (isLoading || options.length === 0)}
+                  >
+                    <option value="">
+                      {isDynamic ? (isLoading ? 'Đang tải...' : '-- Chọn --') : '-- Chọn --'}
+                    </option>
+                    {options.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  {isDynamic && !isLoading && options.length === 0 && (
+                    <div className="form-text text-danger">
+                      Không có lựa chọn phù hợp (có thể chưa chọn đủ thông tin hoặc không còn phòng trống).
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // DATETIME
+            if (f.type === 'datetime') {
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <input
+                    type="datetime-local"
+                    className="form-control"
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                  />
+                </div>
+              );
+            }
+
+            // DATE
+            if (f.type === 'date') {
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <input
+                    type="date"
+                    className="form-control"
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                  />
+                </div>
+              );
+            }
+
+            // NUMBER
+            if (f.type === 'number') {
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                  />
+                </div>
+              );
+            }
+
+            // TEXT
+            if (f.type === 'text') {
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                  />
+                </div>
+              );
+            }
+
+            // TEXTAREA
+            if (f.type === 'textarea') {
+              return (
+                <div className="mb-3" key={f.key}>
+                  <label className="form-label">{f.label}</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    required={!!f.required}
+                    value={form.custom?.[f.key] ?? ''}
+                    onChange={(e) =>
+                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
+                    }
+                  />
+                </div>
+              );
+            }
+
+            return null;
+          })}
+
+          {/* Priority */}
+          <div className="mb-3">
+            <label className="form-label">Mức độ ưu tiên</label>
+            <select
+              className="form-select"
+              value={form.priority}
+              onChange={(e) =>
+                setForm((old) => ({
+                  ...old,
+                  priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
+                }))
+              }
+            >
+              <option value="LOW">LOW</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="HIGH">HIGH</option>
+              <option value="URGENT">URGENT</option>
+            </select>
+          </div>
+
+          {/* Description */}
+          <div className="mb-3">
+            <label className="form-label">Mô tả</label>
+            <textarea
+              className="form-control"
+              rows={3}
+              value={form.description}
+              onChange={(e) => setForm((old) => ({ ...old, description: e.target.value }))}
+            />
+          </div>
+
+          {/* Attachments */}
+          <div className="mb-3">
+            <label className="form-label">Tệp đính kèm</label>
+            <input ref={fileInputRef} type="file" multiple className="form-control" />
+          </div>
+
+          <button type="submit" className="btn btn-primary" disabled={loading || !token}>
+            {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
           </button>
-        </div>
-      </form>
+        </form>
+      )}
     </div>
   );
 }

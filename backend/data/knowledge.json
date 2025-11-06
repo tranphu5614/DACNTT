@@ -1,0 +1,26 @@
+[
+  {
+    "id": "k1",
+    "title": "Không lên màn hình",
+    "keywords": ["không lên màn hình", "màn hình tối", "no display"],
+    "solution": "Kiểm tra dây nguồn và nguồn điện, thử màn hình khác, kiểm tra cáp HDMI/DP/VGA, kiểm tra nguồn máy (PSU) nếu desktop."
+  },
+  {
+    "id": "k2",
+    "title": "Máy chạy chậm",
+    "keywords": ["máy chạy chậm", "chậm", "lag", "treo"],
+    "solution": "Dọn file tạm, tắt chương trình nền, kiểm tra CPU/Memory/Disk, quét virus. Nếu ổ cứng sắp đầy, cân nhắc dọn hoặc thay ổ."
+  },
+  {
+    "id": "k3",
+    "title": "Không kết nối Wi-Fi",
+    "keywords": ["không kết nối wifi", "mất mạng wifi", "wifi ko kết nối"],
+    "solution": "Khởi động lại router, quên và kết nối lại wifi, kiểm tra driver Wi-Fi, thử mạng khác hoặc kiểm tra proxy/VPN công ty."
+  },
+  {
+    "id": "k4",
+    "title": "Chuột/Keyboard không hoạt động",
+    "keywords": ["chuột không hoạt động", "keyboard không nhận", "mouse dead"],
+    "solution": "Thử cổng khác, thử thiết bị khác, kiểm tra pin (chuột không dây), cập nhật driver hoặc thay thiết bị."
+  }
+]

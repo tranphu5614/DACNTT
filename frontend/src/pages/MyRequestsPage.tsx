@@ -94,6 +94,7 @@ export default function MyRequestsPage() {
               <th>Danh mục</th>
               <th>Ưu tiên</th>
               <th>Trạng thái</th>
+              <th>Duyệt</th>
               <th>Tạo lúc</th>
               <th>Cập nhật</th>
             </tr>
@@ -105,6 +106,7 @@ export default function MyRequestsPage() {
                 <td>{r.category}</td>
                 <td>{r.priority ?? '-'}</td>
                 <td>{r.status}</td>
+                <td>{r.approvalStatus ?? 'NONE'}</td>
                 <td>{formatDate(r.createdAt)}</td>
                 <td>{formatDate(r.updatedAt)}</td>
               </tr>

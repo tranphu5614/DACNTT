@@ -1,3 +1,4 @@
+// frontend/src/api/requests.ts
 import { request } from './request';
 
 export type RequestPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -18,7 +19,17 @@ export interface MyRequestItem {
   priority?: RequestPriority;
   createdAt: string;
   updatedAt: string;
-  // ... các field khác nếu có
+
+  // --- quy trình duyệt ---
+  approvalStatus?: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+  currentApprovalLevel?: number;
+  approvals?: Array<{
+    level: number;
+    role: string;
+    decision?: 'APPROVED' | 'REJECTED';
+    comment?: string;
+    approvedAt?: string;
+  }>;
 }
 
 export function apiCreateRequest(
@@ -44,7 +55,7 @@ export function apiCreateRequest(
   fd.append('custom', JSON.stringify(payload.custom || {}));
   (payload.files || []).forEach((f) => fd.append('files', f));
 
-  // ❗️Không gửi requester — BE sẽ tự gán từ JWT
+  // BE tự lấy requester từ JWT
   return request<any>('/requests', { method: 'POST', body: fd }, token);
 }
 
