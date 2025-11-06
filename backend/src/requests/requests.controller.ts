@@ -1,4 +1,3 @@
-// backend/src/requests/requests.controller.ts
 import {
   BadRequestException,
   Body,
@@ -20,7 +19,6 @@ import { RequestsService } from './requests.service';
 import { RoomSize } from './rooms.constants';
 
 function extractUserId(user: any): string | undefined {
-  // hỗ trợ nhiều dạng payload từ JwtStrategy
   return user?.userId ?? user?.sub ?? user?._id ?? user?.id ?? user?.uid;
 }
 
@@ -40,7 +38,6 @@ export class RequestsController {
   }
 
   // ========== TẠO REQUEST ==========
-  // Hỗ trợ upload nhiều file qua field 'files'
   @UseGuards(JwtAuthGuard)
   @Post()
   @UseInterceptors(FilesInterceptor('files'))
@@ -85,16 +82,22 @@ export class RequestsController {
   ) {
     if (!category) throw new BadRequestException('Thiếu tham số category (HR|IT)');
 
-    // RBAC nhanh; ADMIN xem tất
-    const roles: string[] = req?.user?.roles ?? [];
+    // --- FIX BẮT ĐẦU ---
+    // 1. Chuẩn hóa roles về mảng string in hoa để tránh lỗi so sánh và lỗi TypeScript
+    const roles: string[] = (req?.user?.roles ?? []).map((r: any) => String(r).toUpperCase());
+
+    // 2. Kiểm tra quyền (ADMIN được xem tất cả)
     if (!roles.includes('ADMIN')) {
-      if (category === 'HR' && !roles.some((r) => r === 'HR' || r === 'HR_MANAGER')) {
+      // Nếu xem hàng chờ HR mà không có role HR_MANAGER (hoặc HR) -> chặn
+      if (category === 'HR' && !roles.includes('HR_MANAGER') && !roles.includes('HR')) {
         throw new ForbiddenException('Bạn không có quyền xem hàng chờ HR');
       }
-      if (category === 'IT' && !roles.some((r) => r === 'IT' || r === 'IT_MANAGER')) {
+      // Nếu xem hàng chờ IT mà không có role IT_MANAGER (hoặc IT) -> chặn
+      if (category === 'IT' && !roles.includes('IT_MANAGER') && !roles.includes('IT')) {
         throw new ForbiddenException('Bạn không có quyền xem hàng chờ IT');
       }
     }
+    // --- FIX KẾT THÚC ---
 
     const p = page ? parseInt(page, 10) || 1 : 1;
     const l = limit ? parseInt(limit, 10) || 10 : 10;

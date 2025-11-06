@@ -18,6 +18,9 @@ export default function MyRequestsPage() {
   const [limit] = useState(20);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // --- FIX: Thêm state này để buộc reload khi cần ---
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const canLoad = useMemo(() => Boolean(token), [token]);
 
@@ -48,7 +51,14 @@ export default function MyRequestsPage() {
     return () => {
       aborted = true;
     };
-  }, [canLoad, token, page, limit]);
+    // Thêm refreshKey vào dependency array để kích hoạt lại useEffect khi nó thay đổi
+  }, [canLoad, token, page, limit, refreshKey]);
+
+  // --- FIX: Hàm xử lý nút Tải lại ---
+  const handleReload = () => {
+    setPage(1); // Đưa về trang đầu
+    setRefreshKey((prev) => prev + 1); // Thay đổi key để buộc useEffect chạy lại
+  };
 
   if (!token) {
     return (
@@ -70,10 +80,10 @@ export default function MyRequestsPage() {
           <button
             className="btn btn-outline-secondary btn-sm"
             disabled={loading}
-            onClick={() => setPage(1)}
-            title="Tải lại"
+            onClick={handleReload} // 👈 Sử dụng hàm handleReload mới
+            title="Tải lại dữ liệu mới nhất từ server"
           >
-            {loading ? 'Đang tải...' : 'Tải lại'}
+            {loading ? 'Đang tải...' : '↻ Tải lại'}
           </button>
         </div>
       </div>
@@ -88,7 +98,7 @@ export default function MyRequestsPage() {
 
       <div className="table-responsive">
         <table className="table table-sm table-hover align-middle">
-          <thead>
+          <thead className="table-light">
             <tr>
               <th>Tiêu đề</th>
               <th>Danh mục</th>
@@ -102,13 +112,32 @@ export default function MyRequestsPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r._id}>
-                <td>{r.title}</td>
+                <td>
+                  <a href={`/requests/${r._id}`} className="text-decoration-none fw-semibold">
+                    {r.title || '(Không tiêu đề)'}
+                  </a>
+                </td>
                 <td>{r.category}</td>
-                <td>{r.priority ?? '-'}</td>
-                <td>{r.status}</td>
-                <td>{r.approvalStatus ?? 'NONE'}</td>
-                <td>{formatDate(r.createdAt)}</td>
-                <td>{formatDate(r.updatedAt)}</td>
+                <td>
+                  {r.priority ? <span className={`badge ${r.priority === 'URGENT' ? 'text-bg-danger' : r.priority === 'HIGH' ? 'text-bg-warning' : 'text-bg-info'}`}>{r.priority}</span> : '-'}
+                </td>
+                <td><span className="badge text-bg-secondary">{r.status}</span></td>
+                <td>
+                  <span
+                    className={
+                      'badge ' +
+                      (r.approvalStatus === 'APPROVED'
+                        ? 'text-bg-success'
+                        : r.approvalStatus === 'REJECTED'
+                        ? 'text-bg-danger'
+                        : 'text-bg-light text-dark border')
+                    }
+                  >
+                    {r.approvalStatus ?? 'NONE'}
+                  </span>
+                </td>
+                <td className="small text-muted">{formatDate(r.createdAt)}</td>
+                <td className="small text-muted">{formatDate(r.updatedAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -116,7 +145,7 @@ export default function MyRequestsPage() {
       </div>
 
       {total > limit && (
-        <div className="d-flex gap-2">
+        <div className="d-flex gap-2 mt-3 justify-content-end">
           <button
             className="btn btn-outline-primary btn-sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -124,7 +153,7 @@ export default function MyRequestsPage() {
           >
             « Trước
           </button>
-          <span className="align-self-center">Trang {page}</span>
+          <span className="align-self-center px-2">Trang {page}</span>
           <button
             className="btn btn-outline-primary btn-sm"
             onClick={() => setPage((p) => p + 1)}

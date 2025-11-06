@@ -1,12 +1,11 @@
-// frontend/src/pages/NewRequestPage.tsx
-// Sử dụng fetch wrapper của bạn: request.ts + requests.ts (không dùng axios)
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 👈 Import useNavigate
 import { request as apiRequest } from '../api/request';
 import { apiCreateRequest } from '../api/requests';
+import { apiSuggestKnowledge, apiCompleteText, KnowledgeSuggestion } from '../api/ai';
 
 type SelectOption = { value: string; label: string };
 
-// ====== Kiểu dữ liệu khớp với backend/src/catalog/catalog.data.ts ======
 type StaticSelectField = {
   key: string;
   label: string;
@@ -20,7 +19,7 @@ type DynamicSelectField = {
   label: string;
   type: 'select';
   required?: boolean;
-  optionsUrlTemplate: string; // ví dụ: /requests/available-rooms?start={custom.start}&end={custom.end}&size={custom.size}
+  optionsUrlTemplate: string;
 };
 
 type BaseField =
@@ -35,10 +34,10 @@ type CatalogItem = {
   fields: CatalogField[];
 };
 
-// Trả về từ /requests/available-rooms
 type Room = { key: string; name: string; size: 'SMALL' | 'LARGE' };
 
 export default function NewRequestPage() {
+  const navigate = useNavigate(); // 👈 Khởi tạo hook điều hướng
   const [token, setToken] = useState<string>('');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [form, setForm] = useState<{
@@ -62,13 +61,15 @@ export default function NewRequestPage() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [aiSuggestions, setAiSuggestions] = useState<KnowledgeSuggestion[]>([]);
+  const [completing, setCompleting] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setToken(localStorage.getItem('token') || '');
   }, []);
 
-  // Helper: build URL từ template (thay {custom.xxx}, {title}, {category}, {typeKey})
   function buildUrlFromTemplate(tpl: string): string {
     return tpl.replace(/\{([^}]+)\}/g, (_m, expr: string) => {
       try {
@@ -83,7 +84,6 @@ export default function NewRequestPage() {
     });
   }
 
-  // Helper: chuyển datetime-local -> ISO
   function toISO(v: string): string {
     return v ? new Date(v).toISOString() : '';
   }
@@ -93,7 +93,38 @@ export default function NewRequestPage() {
     [catalog, form.typeKey],
   );
 
-  // Tải catalog theo category
+  // AI Suggestion
+  useEffect(() => {
+    if (!token || form.category !== 'IT' || !form.title || form.title.trim().length < 3) {
+      setAiSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiSuggestKnowledge(token, form.title);
+        setAiSuggestions(res.filter((s) => s.score > 0.3).slice(0, 3));
+      } catch (e) { /* ignore */ }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [token, form.category, form.title]);
+
+  // AI Complete
+  const onAiComplete = async () => {
+    if (!token || !form.description.trim()) return;
+    setCompleting(true);
+    try {
+      const res = await apiCompleteText(token, form.description);
+      if (res.completed) {
+        setForm((prev) => ({ ...prev, description: prev.description + res.completed }));
+      }
+    } catch (e) {
+      alert('AI không phản hồi, vui lòng thử lại sau.');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  // Load catalog
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -109,7 +140,6 @@ export default function NewRequestPage() {
 
         setCatalog(data || []);
 
-        // Nếu typeKey hiện tại không thuộc category mới -> reset chọn mẫu đầu tiên
         if (!data?.find((x) => x.typeKey === form.typeKey)) {
           const first = data?.[0];
           setForm((old) => ({
@@ -130,10 +160,9 @@ export default function NewRequestPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, form.category]);
 
-  // Fetch options động cho các field có optionsUrlTemplate
+  // Load dynamic fields
   useEffect(() => {
     if (!token || !current) return;
     let cancelled = false;
@@ -143,7 +172,6 @@ export default function NewRequestPage() {
 
       const url = buildUrlFromTemplate((f as DynamicSelectField).optionsUrlTemplate);
 
-      // Nếu còn placeholder -> chưa đủ dữ liệu
       if (/\{[^}]+\}/.test(url)) {
         setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
         return;
@@ -151,7 +179,6 @@ export default function NewRequestPage() {
 
       try {
         setLoadingRemote((prev) => ({ ...prev, [f.key]: true }));
-        // Với API /requests/available-rooms, kết quả là Room[]
         const data = await apiRequest<Array<Room | { key?: string; name?: string; value?: string; label?: string }>>(
           url,
           { method: 'GET' },
@@ -159,7 +186,6 @@ export default function NewRequestPage() {
         );
         if (cancelled) return;
 
-        // Chuẩn hoá về SelectOption
         const mapped: SelectOption[] = (data || []).map((d: any) => ({
           value: String(d.value ?? d.key ?? ''),
           label: String(d.label ?? d.name ?? d.value ?? d.key ?? ''),
@@ -167,7 +193,6 @@ export default function NewRequestPage() {
 
         setRemoteOptions((prev) => ({ ...prev, [f.key]: mapped }));
 
-        // Nếu giá trị hiện tại không còn hợp lệ -> reset
         if (form.custom?.[f.key] && !mapped.find((m) => m.value === form.custom[f.key])) {
           setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: '' } }));
         }
@@ -187,10 +212,9 @@ export default function NewRequestPage() {
     return () => {
       cancelled = true;
     };
-    // phụ thuộc: typeKey + các custom fields ảnh hưởng template (thường: start/end/size)
-  }, [token, current, form.typeKey, form.custom?.start, form.custom?.end, form.custom?.size]); // eslint-disable-line
+  }, [token, current, form.typeKey, form.custom?.start, form.custom?.end, form.custom?.size]);
 
-  // Submit
+  // --- SUBMIT FORM ---
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
@@ -219,20 +243,14 @@ export default function NewRequestPage() {
         files,
       });
 
-      setMsg({ type: 'success', text: 'Tạo yêu cầu thành công!' });
+      // --- FIX: Thông báo và tự động chuyển hướng ---
+      alert('✅ Tạo yêu cầu thành công! Đang chuyển về danh sách...');
+      navigate('/requests/mine'); // Chuyển hướng về trang danh sách
+      // ---------------------------------------------
 
-      // reset form tối thiểu
-      setForm((old) => ({
-        ...old,
-        title: current?.title ?? '',
-        description: '',
-        custom: {},
-      }));
-      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       const text = err?.message || 'Không thể tạo yêu cầu. Vui lòng thử lại.';
       setMsg({ type: 'error', text });
-    } finally {
       setLoading(false);
     }
   };
@@ -241,66 +259,63 @@ export default function NewRequestPage() {
     <div className="container py-3">
       <h3 className="mb-3">Tạo yêu cầu</h3>
 
-      {/* Alerts */}
       {msg && (
         <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} role="alert">
           {msg.text}
         </div>
       )}
 
-      {/* Category */}
-      <div className="mb-3">
-        <label className="form-label">Danh mục</label>
-        <select
-          className="form-select"
-          value={form.category}
-          onChange={(e) =>
-            setForm((old) => ({
-              ...old,
-              category: e.target.value as 'HR' | 'IT',
-              typeKey: '',
-              title: '',
-              custom: {},
-              description: '',
-            }))
-          }
-        >
-          <option value="HR">HR</option>
-          <option value="IT">IT</option>
-        </select>
+      <div className="row mb-3">
+        <div className="col-md-6">
+          <label className="form-label">Danh mục</label>
+          <select
+            className="form-select"
+            value={form.category}
+            onChange={(e) =>
+              setForm((old) => ({
+                ...old,
+                category: e.target.value as 'HR' | 'IT',
+                typeKey: '',
+                title: '',
+                custom: {},
+                description: '',
+              }))
+            }
+          >
+            <option value="HR">HR</option>
+            <option value="IT">IT</option>
+          </select>
+        </div>
+
+        <div className="col-md-6">
+          <label className="form-label">Loại yêu cầu</label>
+          <select
+            className="form-select"
+            value={form.typeKey}
+            onChange={(e) => {
+              const tk = e.target.value;
+              const found = catalog.find((c) => c.typeKey === tk);
+              setForm((old) => ({
+                ...old,
+                typeKey: tk,
+                title: found?.title ?? '',
+                custom: {},
+              }));
+              setRemoteOptions({});
+            }}
+          >
+            <option value="">-- Chọn --</option>
+            {catalog.map((c) => (
+              <option key={c.typeKey} value={c.typeKey}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* TypeKey */}
-      <div className="mb-3">
-        <label className="form-label">Loại yêu cầu</label>
-        <select
-          className="form-select"
-          value={form.typeKey}
-          onChange={(e) => {
-            const tk = e.target.value;
-            const found = catalog.find((c) => c.typeKey === tk);
-            setForm((old) => ({
-              ...old,
-              typeKey: tk,
-              title: found?.title ?? '',
-              custom: {},
-            }));
-            setRemoteOptions({});
-          }}
-        >
-          <option value="">-- Chọn --</option>
-          {catalog.map((c) => (
-            <option key={c.typeKey} value={c.typeKey}>
-              {c.title}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Form fields */}
       {current && (
         <form onSubmit={onSubmit}>
-          {/* Title */}
           <div className="mb-3">
             <label className="form-label">Tiêu đề</label>
             <input
@@ -309,10 +324,21 @@ export default function NewRequestPage() {
               onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
               placeholder={current.title}
             />
+            {aiSuggestions.length > 0 && (
+              <div className="alert alert-info mt-2 mb-0 p-2" style={{ fontSize: '0.9rem' }}>
+                <strong>💡 Gợi ý từ AI:</strong>
+                <ul className="mb-0 ps-3">
+                  {aiSuggestions.map((s) => (
+                    <li key={s.id}>
+                      <strong>{s.title}:</strong> {s.suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
           {current.fields.map((f) => {
-            // SELECT (static / dynamic)
             if (f.type === 'select') {
               const dynTpl = (f as DynamicSelectField).optionsUrlTemplate;
               const isDynamic = typeof dynTpl === 'string' && dynTpl.length > 0;
@@ -324,7 +350,7 @@ export default function NewRequestPage() {
 
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
                   <select
                     className="form-select"
                     required={!!f.required}
@@ -345,99 +371,58 @@ export default function NewRequestPage() {
                   </select>
                   {isDynamic && !isLoading && options.length === 0 && (
                     <div className="form-text text-danger">
-                      Không có lựa chọn phù hợp (có thể chưa chọn đủ thông tin hoặc không còn phòng trống).
+                      Không có lựa chọn phù hợp.
                     </div>
                   )}
                 </div>
               );
             }
 
-            // DATETIME
+            const commonProps = {
+              className: 'form-control',
+              required: !!f.required,
+              value: form.custom?.[f.key] ?? '',
+              onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+                setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } })),
+            };
+
             if (f.type === 'datetime') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
-                  <input
-                    type="datetime-local"
-                    className="form-control"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                  />
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
+                  <input type="datetime-local" {...commonProps} />
                 </div>
               );
             }
-
-            // DATE
             if (f.type === 'date') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
-                  <input
-                    type="date"
-                    className="form-control"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                  />
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
+                  <input type="date" {...commonProps} />
                 </div>
               );
             }
-
-            // NUMBER
             if (f.type === 'number') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                  />
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
+                  <input type="number" {...commonProps} />
                 </div>
               );
             }
-
-            // TEXT
             if (f.type === 'text') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                  />
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
+                  <input type="text" {...commonProps} />
                 </div>
               );
             }
-
-            // TEXTAREA
             if (f.type === 'textarea') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label}</label>
-                  <textarea
-                    className="form-control"
-                    rows={3}
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                  />
+                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
+                  <textarea rows={3} {...commonProps} />
                 </div>
               );
             }
@@ -445,7 +430,6 @@ export default function NewRequestPage() {
             return null;
           })}
 
-          {/* Priority */}
           <div className="mb-3">
             <label className="form-label">Mức độ ưu tiên</label>
             <select
@@ -465,18 +449,20 @@ export default function NewRequestPage() {
             </select>
           </div>
 
-          {/* Description */}
           <div className="mb-3">
-            <label className="form-label">Mô tả</label>
+            <div className="d-flex justify-content-between align-items-center mb-1">
+              <label className="form-label mb-0">Mô tả</label>
+              
+            </div>
             <textarea
               className="form-control"
-              rows={3}
+              rows={4}
               value={form.description}
               onChange={(e) => setForm((old) => ({ ...old, description: e.target.value }))}
+              placeholder="Nhập mô tả chi tiết..."
             />
           </div>
 
-          {/* Attachments */}
           <div className="mb-3">
             <label className="form-label">Tệp đính kèm</label>
             <input ref={fileInputRef} type="file" multiple className="form-control" />
