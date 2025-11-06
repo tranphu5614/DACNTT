@@ -1,8 +1,6 @@
-// backend/src/knowledge/knowledge.service.ts
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { pipeline } from '@xenova/transformers';
 
 type KnowledgeItem = {
   id: string;
@@ -39,6 +37,8 @@ export class KnowledgeService implements OnModuleDestroy {
   private async initModelAndEmbeddings() {
     try {
       this.logger.log('Loading embedding model (this may take a while the first time)...');
+      // Dynamic import để tránh lỗi ESM
+      const { pipeline } = await import('@xenova/transformers');
       this.model = await pipeline(
         'feature-extraction',
         'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
@@ -53,7 +53,6 @@ export class KnowledgeService implements OnModuleDestroy {
       this.logger.log('Knowledge embeddings ready');
     } catch (err) {
       this.logger.error('Failed to initialize embedding model', err);
-      throw err;
     }
   }
 
@@ -85,54 +84,29 @@ export class KnowledgeService implements OnModuleDestroy {
 
   async autocomplete(query: string, topK = 5) {
     if (!query || query.trim().length === 0) return [];
-    await this.ready();
+    try {
+      await this.ready();
+      if (!this.model) return [];
 
-    const qEmb = await this.embed(query);
+      const qEmb = await this.embed(query);
 
-    const scored = this.kbEmbeddings.map((emb, idx) => {
-      const score = this.cosine(qEmb, emb);
-      return { item: this.knowledge[idx], score };
-    });
+      const scored = this.kbEmbeddings.map((emb, idx) => {
+        const score = this.cosine(qEmb, emb);
+        return { item: this.knowledge[idx], score };
+      });
 
-    scored.sort((a, b) => b.score - a.score);
+      scored.sort((a, b) => b.score - a.score);
 
-    const suggestions = scored.slice(0, topK).map(s => ({
-      id: s.item.id,
-      title: s.item.title || (s.item.keywords ? s.item.keywords[0] : ''),
-      suggestion: s.item.solution,
-      score: s.score,
-    }));
-
-    return suggestions;
-  }
-
-  async getBestSuggestion(problemText: string) {
-    await this.ready();
-    const qEmb = await this.embed(problemText);
-
-    let bestIndex = -1;
-    let bestScore = -Infinity;
-    for (let i = 0; i < this.kbEmbeddings.length; i++) {
-      const score = this.cosine(qEmb, this.kbEmbeddings[i]);
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = i;
-      }
+      return scored.slice(0, topK).map(s => ({
+        id: s.item.id,
+        title: s.item.title || (s.item.keywords ? s.item.keywords[0] : ''),
+        suggestion: s.item.solution,
+        score: s.score,
+      }));
+    } catch (e) {
+      this.logger.warn('Autocomplete failed', e);
+      return [];
     }
-
-    if (bestIndex === -1) return null;
-    if (bestScore < 0.25) return null;
-
-    return {
-      matchedKnowledgeId: this.knowledge[bestIndex].id,
-      suggestionText: this.knowledge[bestIndex].solution,
-      confidence: bestScore,
-    };
-  }
-
-  async reloadKnowledge() {
-    this.loadKnowledge();
-    await this.initModelAndEmbeddings();
   }
 
   onModuleDestroy() {}

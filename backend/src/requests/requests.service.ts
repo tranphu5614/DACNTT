@@ -122,7 +122,9 @@ export class RequestsService {
       bookingRoomKey: dto.bookingRoomKey,
       bookingStart: dto.bookingStart,
       bookingEnd: dto.bookingEnd,
-      requester: requesterId,
+      // --- FIX: Đảm bảo lưu requester dưới dạng ObjectId ---
+      requester: new Types.ObjectId(requesterId),
+      // ----------------------------------------------------
       attachments,
       approvals: approvalsFromCatalog,
       currentApprovalLevel: 0,
@@ -133,6 +135,7 @@ export class RequestsService {
   }
 
   async listMine(userId: string, page = 1, limit = 10) {
+    // Đảm bảo userId đầu vào cũng được chuyển thành ObjectId để truy vấn khớp
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
     const l = Math.min(200, Math.max(1, Math.floor(limit)));
@@ -277,9 +280,6 @@ export class RequestsService {
     return doc;
   }
 
-  /**
-   * ✅ Gợi ý mô tả lỗi (AI Autocomplete nhẹ)
-   */
   async suggestDescriptions(query: string): Promise<string[]> {
     if (!query || query.trim().length < 2) return [];
 
