@@ -15,10 +15,15 @@ import AdminUsersListPage from './pages/AdminUsersListPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import RequireRoles from './routes/RequireRoles';
 import RequestsQueuePage from './pages/RequestsQueuePage';
+
+// 👇 thêm
+import RequestsToApprove from './pages/RequestsToApprove';
+import RequestDetail from './pages/RequestDetail';
+
 export default function App() {
   const { token, user, logout } = useAuth();
 
-  // Chưa đăng nhập: layout gọn, không có sidebar
+  // Chưa đăng nhập
   if (!token) {
     return (
       <div className="container py-5">
@@ -36,13 +41,12 @@ export default function App() {
     );
   }
 
-  // Đã đăng nhập: navbar + sidebar
+  // Đã đăng nhập
   return (
     <div className="container-fluid p-0">
       {/* Top navbar */}
       <nav className="navbar navbar-expand bg-body-tertiary border-bottom sticky-top">
         <div className="container-fluid">
-          {/* Toggle offcanvas (mobile) */}
           <button
             className="btn btn-outline-secondary d-lg-none me-2"
             type="button"
@@ -57,12 +61,13 @@ export default function App() {
 
           <div className="ms-auto d-flex align-items-center gap-2">
             <span className="text-secondary d-none d-sm-inline">Hi, {user?.name}</span>
-            <button className="btn btn-outline-danger btn-sm" onClick={logout}>Logout</button>
+            <button className="btn btn-outline-danger btn-sm" onClick={logout}>
+              Logout
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* Main grid: sidebar (lg+) + content */}
       <div className="row g-0">
         <div className="col-lg-2 d-none d-lg-block border-end">
           <Sidebar variant="static" />
@@ -70,11 +75,16 @@ export default function App() {
 
         <div className="col-12 col-lg-10 p-3">
           <Routes>
-            {/* Khu vực đã đăng nhập */}
+            {/* Logged-in area */}
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/requests/new" element={<RequestNewPage />} />
               <Route path="/requests/mine" element={<MyRequestsPage />} />
+              {/* 👇 request chờ tôi duyệt */}
+              <Route path="/requests/pending" element={<RequestsToApprove />} />
+              {/* 👇 chi tiết 1 request */}
+              <Route path="/requests/:id" element={<RequestDetail />} />
+
               <Route
                 path="/queue/hr"
                 element={
