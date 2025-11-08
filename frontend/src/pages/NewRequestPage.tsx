@@ -1,8 +1,9 @@
+// frontend/src/pages/NewRequestPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // 👈 Import useNavigate
+import { useNavigate } from 'react-router-dom';
 import { request as apiRequest } from '../api/request';
 import { apiCreateRequest } from '../api/requests';
-import { apiSuggestKnowledge, apiCompleteText, KnowledgeSuggestion } from '../api/ai';
+import { apiSuggestKnowledge, KnowledgeSuggestion } from '../api/ai';
 
 type SelectOption = { value: string; label: string };
 
@@ -37,22 +38,19 @@ type CatalogItem = {
 type Room = { key: string; name: string; size: 'SMALL' | 'LARGE' };
 
 export default function NewRequestPage() {
-  const navigate = useNavigate(); // 👈 Khởi tạo hook điều hướng
+  const navigate = useNavigate();
   const [token, setToken] = useState<string>('');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [form, setForm] = useState<{
     category: 'HR' | 'IT';
     typeKey: string;
     title: string;
-    description: string;
-    priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    // Đã bỏ description và priority khỏi state form UI
     custom: Record<string, any>;
   }>({
     category: 'HR',
     typeKey: '',
     title: '',
-    description: '',
-    priority: 'MEDIUM',
     custom: {},
   });
 
@@ -62,7 +60,6 @@ export default function NewRequestPage() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [aiSuggestions, setAiSuggestions] = useState<KnowledgeSuggestion[]>([]);
-  const [completing, setCompleting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -93,7 +90,7 @@ export default function NewRequestPage() {
     [catalog, form.typeKey],
   );
 
-  // AI Suggestion
+  // AI Suggestion chỉ dựa trên Title
   useEffect(() => {
     if (!token || form.category !== 'IT' || !form.title || form.title.trim().length < 3) {
       setAiSuggestions([]);
@@ -107,22 +104,6 @@ export default function NewRequestPage() {
     }, 500);
     return () => clearTimeout(timer);
   }, [token, form.category, form.title]);
-
-  // AI Complete
-  const onAiComplete = async () => {
-    if (!token || !form.description.trim()) return;
-    setCompleting(true);
-    try {
-      const res = await apiCompleteText(token, form.description);
-      if (res.completed) {
-        setForm((prev) => ({ ...prev, description: prev.description + res.completed }));
-      }
-    } catch (e) {
-      alert('AI không phản hồi, vui lòng thử lại sau.');
-    } finally {
-      setCompleting(false);
-    }
-  };
 
   // Load catalog
   useEffect(() => {
@@ -147,7 +128,6 @@ export default function NewRequestPage() {
             typeKey: first?.typeKey ?? '',
             title: first?.title ?? '',
             custom: {},
-            description: '',
           }));
           setRemoteOptions({});
         }
@@ -237,16 +217,14 @@ export default function NewRequestPage() {
         category: form.category,
         typeKey: form.typeKey,
         title: form.title || current?.title || '',
-        description: form.description || '',
-        priority: form.priority,
+        description: '', // Luôn gửi rỗng
+        priority: '',    // Luôn gửi rỗng để BE tự chạy AI
         custom: normalizedCustom,
         files,
       });
 
-      // --- FIX: Thông báo và tự động chuyển hướng ---
       alert('✅ Tạo yêu cầu thành công! Đang chuyển về danh sách...');
-      navigate('/requests/mine'); // Chuyển hướng về trang danh sách
-      // ---------------------------------------------
+      navigate('/requests/mine');
 
     } catch (err: any) {
       const text = err?.message || 'Không thể tạo yêu cầu. Vui lòng thử lại.';
@@ -278,7 +256,6 @@ export default function NewRequestPage() {
                 typeKey: '',
                 title: '',
                 custom: {},
-                description: '',
               }))
             }
           >
@@ -317,13 +294,18 @@ export default function NewRequestPage() {
       {current && (
         <form onSubmit={onSubmit}>
           <div className="mb-3">
-            <label className="form-label">Tiêu đề</label>
+            <label className="form-label">Tiêu đề <span className="text-danger">*</span></label>
             <input
               className="form-control"
+              required
               value={form.title}
               onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
               placeholder={current.title}
             />
+            <div className="form-text">
+              Hệ thống sẽ tự động phân tích mức độ ưu tiên dựa trên tiêu đề bạn nhập.
+            </div>
+
             {aiSuggestions.length > 0 && (
               <div className="alert alert-info mt-2 mb-0 p-2" style={{ fontSize: '0.9rem' }}>
                 <strong>💡 Gợi ý từ AI:</strong>
@@ -429,39 +411,6 @@ export default function NewRequestPage() {
 
             return null;
           })}
-
-          <div className="mb-3">
-            <label className="form-label">Mức độ ưu tiên</label>
-            <select
-              className="form-select"
-              value={form.priority}
-              onChange={(e) =>
-                setForm((old) => ({
-                  ...old,
-                  priority: e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT',
-                }))
-              }
-            >
-              <option value="LOW">LOW</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="HIGH">HIGH</option>
-              <option value="URGENT">URGENT</option>
-            </select>
-          </div>
-
-          <div className="mb-3">
-            <div className="d-flex justify-content-between align-items-center mb-1">
-              <label className="form-label mb-0">Mô tả</label>
-              
-            </div>
-            <textarea
-              className="form-control"
-              rows={4}
-              value={form.description}
-              onChange={(e) => setForm((old) => ({ ...old, description: e.target.value }))}
-              placeholder="Nhập mô tả chi tiết..."
-            />
-          </div>
 
           <div className="mb-3">
             <label className="form-label">Tệp đính kèm</label>
