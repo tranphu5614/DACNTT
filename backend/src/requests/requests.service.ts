@@ -11,6 +11,7 @@ import { Request as RequestEntity, RequestDocument } from './schemas/request.sch
 import { ROOMS, RoomSize } from './rooms.constants';
 import { DEFAULT_CATALOG } from '../catalog/catalog.data';
 import { ERROR_SUGGESTIONS } from './suggestions.data';
+import { PriorityClassifierService } from '../ai/priority-classifier.service';
 
 type BusyDoc = { bookingRoomKey?: string };
 
@@ -19,6 +20,7 @@ export class RequestsService {
   constructor(
     @InjectModel(RequestEntity.name)
     private readonly model: Model<RequestDocument>,
+    private readonly priorityClassifier: PriorityClassifierService,
   ) {}
 
   private getCatalogByTypeKey(typeKey: string) {
@@ -66,6 +68,25 @@ export class RequestsService {
         dto.custom = {};
       }
     }
+
+    // === [AUTO-PRIORITY AI] ===
+    if (!dto.priority) {
+      const textParts = [dto.title, dto.description].filter(Boolean);
+      const textToAnalyze = textParts.join('. ');
+
+      // Chỉ chạy AI nếu có nội dung đủ dài để phân tích (ví dụ >= 5 ký tự)
+      if (textToAnalyze && textToAnalyze.trim().length >= 5) {
+        const suggested = await this.priorityClassifier.suggestPriority(textToAnalyze);
+        if (suggested) {
+          dto.priority = suggested;
+        } else {
+          dto.priority = 'MEDIUM'; // AI không chắc chắn
+        }
+      } else {
+        dto.priority = 'MEDIUM'; // Không đủ thông tin
+      }
+    }
+    // === [END AUTO-PRIORITY] ===
 
     const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
     const approvalsFromCatalog =
@@ -122,9 +143,7 @@ export class RequestsService {
       bookingRoomKey: dto.bookingRoomKey,
       bookingStart: dto.bookingStart,
       bookingEnd: dto.bookingEnd,
-      // --- FIX: Đảm bảo lưu requester dưới dạng ObjectId ---
       requester: new Types.ObjectId(requesterId),
-      // ----------------------------------------------------
       attachments,
       approvals: approvalsFromCatalog,
       currentApprovalLevel: 0,
@@ -135,7 +154,6 @@ export class RequestsService {
   }
 
   async listMine(userId: string, page = 1, limit = 10) {
-    // Đảm bảo userId đầu vào cũng được chuyển thành ObjectId để truy vấn khớp
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
     const l = Math.min(200, Math.max(1, Math.floor(limit)));
@@ -144,6 +162,7 @@ export class RequestsService {
     const [items, total] = await Promise.all([
       this.model
         .find({ requester: uid })
+        .populate('requester', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l)
@@ -174,6 +193,7 @@ export class RequestsService {
     const [items, total] = await Promise.all([
       this.model
         .find(query)
+        .populate('requester', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l)
@@ -185,7 +205,11 @@ export class RequestsService {
   }
 
   async getById(id: string) {
-    const doc = await this.model.findById(id).exec();
+    const doc = await this.model
+      .findById(id)
+      .populate('requester', 'name email')
+      .populate('approvals.approver', 'name email') // Populate thêm người duyệt để hiển thị tên họ
+      .exec();
     if (!doc) throw new NotFoundException('Request not found');
     return doc;
   }
@@ -196,6 +220,7 @@ export class RequestsService {
 
     return this.model
       .find({
+        requester: { $ne: new Types.ObjectId(user._id) }, // Loại bỏ request của chính mình
         approvalStatus: { $in: ['PENDING', 'IN_REVIEW'] },
         approvals: {
           $elemMatch: {
@@ -204,6 +229,7 @@ export class RequestsService {
           },
         },
       })
+      .populate('requester', 'name email')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
@@ -212,6 +238,11 @@ export class RequestsService {
   async approve(id: string, user: { _id: string; roles?: string[] }, comment?: string) {
     const doc = await this.model.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
+
+    // Chặn tự duyệt
+    if (doc.requester.toString() === user._id) {
+      throw new ForbiddenException('Bạn không thể tự duyệt yêu cầu của mình');
+    }
 
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');
@@ -250,6 +281,11 @@ export class RequestsService {
   async reject(id: string, user: { _id: string; roles?: string[] }, comment?: string) {
     const doc = await this.model.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
+
+    // Chặn tự từ chối
+    if (doc.requester.toString() === user._id) {
+      throw new ForbiddenException('Bạn không thể tự duyệt/từ chối yêu cầu của mình');
+    }
 
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');

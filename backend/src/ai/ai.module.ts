@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AiController } from './ai.controller';
-import { TextCompleteService } from './text-complete.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
+import { PriorityClassifierService } from './priority-classifier.service';
 
 @Module({
   controllers: [AiController],
-  providers: [TextCompleteService, KnowledgeService],
-  exports: [TextCompleteService, KnowledgeService],
+  providers: [KnowledgeService, PriorityClassifierService],
+  exports: [KnowledgeService, PriorityClassifierService],
 })
 export class AiModule {}

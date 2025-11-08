@@ -39,7 +39,7 @@ export function apiCreateRequest(
     typeKey: string;
     title: string;
     description: string;
-    priority: RequestPriority;
+    priority: RequestPriority | ''; // [UPDATED] Cho phép chuỗi rỗng
     custom: Record<string, any>;
     files?: File[];
   }
@@ -51,7 +51,12 @@ export function apiCreateRequest(
   fd.append('typeKey', payload.typeKey);
   fd.append('title', payload.title);
   fd.append('description', payload.description);
-  fd.append('priority', payload.priority);
+
+  // [UPDATED] Chỉ gửi priority nếu người dùng đã chọn (không phải chuỗi rỗng)
+  if (payload.priority) {
+    fd.append('priority', payload.priority);
+  }
+
   fd.append('custom', JSON.stringify(payload.custom || {}));
   (payload.files || []).forEach((f) => fd.append('files', f));
 

@@ -5,7 +5,11 @@ import { useAuth } from '../context/AuthContext';
 
 function formatDate(v?: string) {
   if (!v) return '—';
-  return new Date(v).toLocaleString();
+  try {
+    return new Date(v).toLocaleString();
+  } catch {
+    return v;
+  }
 }
 
 export default function RequestDetail() {
@@ -36,10 +40,14 @@ export default function RequestDetail() {
   }, [id, token]);
 
   const reload = async () => {
-    const res = await api.get(`/requests/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setData(res.data);
+    try {
+      const res = await api.get(`/requests/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setData(res.data);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   if (!token) return <div className="container py-4">Cần đăng nhập.</div>;
@@ -49,7 +57,7 @@ export default function RequestDetail() {
       <div className="container py-4">
         <div className="alert alert-danger d-flex justify-content-between align-items-center">
           <span>{error}</span>
-          <button className="btn btn-sm btn-outline-light" onClick={() => navigate(-1)}>
+          <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(-1)}>
             Quay lại
           </button>
         </div>
@@ -62,6 +70,9 @@ export default function RequestDetail() {
   const approvalStatus = data.approvalStatus || 'NONE';
   const currentLevel = data.currentApprovalLevel || 0;
   const myRoles: string[] = user?.roles || [];
+
+  // Kiểm tra xem đây có phải là yêu cầu của chính mình không (hỗ trợ cả khi requester là object hoặc string ID)
+  const isMine = user?._id === data.requester || user?._id === (data.requester as any)?._id;
 
   const nextLevel = currentLevel + 1;
   const nextStep = approvals.find((a: any) => a.level === nextLevel);
@@ -76,9 +87,11 @@ export default function RequestDetail() {
     (approvals.length === 0 || approvalStatus === 'NONE') &&
     (myRoles.includes('ADMIN') || myRoles.includes('HR_MANAGER') || myRoles.includes('IT_MANAGER'));
 
-  const canApprove = canApproveNormal || canApproveForce;
+  // Chỉ cho phép duyệt nếu KHÔNG PHẢI là yêu cầu của mình (!isMine)
+  const canApprove = !isMine && (canApproveNormal || canApproveForce);
 
   const doAction = async (type: 'approve' | 'reject') => {
+    if (!confirm(`Bạn chắc chắn muốn ${type === 'approve' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return;
     setActionLoading(true);
     try {
       await api.patch(
@@ -88,6 +101,7 @@ export default function RequestDetail() {
       );
       setComment('');
       await reload();
+      alert('Thao tác thành công!');
     } catch (e: any) {
       alert(e?.response?.data?.message || 'Thao tác thất bại');
     } finally {
@@ -100,48 +114,26 @@ export default function RequestDetail() {
     if (data.typeKey === 'meeting_room_booking') {
       return (
         <dl className="row mb-0">
-          <dt className="col-5 text-muted" style={{ fontSize: 13 }}>
-            Loại phòng
-          </dt>
-          <dd className="col-7" style={{ fontSize: 13 }}>
-            {c.size || '—'}
-          </dd>
-          <dt className="col-5 text-muted" style={{ fontSize: 13 }}>
-            Bắt đầu
-          </dt>
-          <dd className="col-7" style={{ fontSize: 13 }}>
-            {c.start ? new Date(c.start).toLocaleString() : '—'}
-          </dd>
-          <dt className="col-5 text-muted" style={{ fontSize: 13 }}>
-            Kết thúc
-          </dt>
-          <dd className="col-7" style={{ fontSize: 13 }}>
-            {c.end ? new Date(c.end).toLocaleString() : '—'}
-          </dd>
-          <dt className="col-5 text-muted" style={{ fontSize: 13 }}>
-            Phòng
-          </dt>
-          <dd className="col-7" style={{ fontSize: 13 }}>
-            {c.roomKey || '—'}
-          </dd>
+          <dt className="col-sm-4 text-muted">Loại phòng</dt>
+          <dd className="col-sm-8">{c.size || '—'}</dd>
+          <dt className="col-sm-4 text-muted">Bắt đầu</dt>
+          <dd className="col-sm-8">{c.start ? new Date(c.start).toLocaleString() : '—'}</dd>
+          <dt className="col-sm-4 text-muted">Kết thúc</dt>
+          <dd className="col-sm-8">{c.end ? new Date(c.end).toLocaleString() : '—'}</dd>
+          <dt className="col-sm-4 text-muted">Phòng</dt>
+          <dd className="col-sm-8 fw-bold text-primary">{c.roomKey || '—'}</dd>
         </dl>
       );
     }
     const keys = Object.keys(c);
-    if (!keys.length) return <p className="mb-0 text-muted">Không có</p>;
+    if (!keys.length) return <p className="mb-0 text-muted">Không có dữ liệu bổ sung.</p>;
     return (
       <dl className="row mb-0">
         {keys.map((k) => (
           <React.Fragment key={k}>
-            <dt className="col-5 text-muted" style={{ fontSize: 13 }}>
-              {k}
-            </dt>
-            <dd className="col-7" style={{ fontSize: 13 }}>
-              {typeof c[k] === 'string' || typeof c[k] === 'number'
-                ? String(c[k])
-                : Array.isArray(c[k])
-                ? c[k].join(', ')
-                : JSON.stringify(c[k])}
+            <dt className="col-sm-4 text-muted text-truncate" title={k}>{k}</dt>
+            <dd className="col-sm-8 text-break">
+              {typeof c[k] === 'object' ? JSON.stringify(c[k]) : String(c[k])}
             </dd>
           </React.Fragment>
         ))}
@@ -151,27 +143,31 @@ export default function RequestDetail() {
 
   return (
     <div className="container py-4" style={{ maxWidth: 900 }}>
-      {/* header */}
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-start mb-4">
         <div>
-          <h3 className="mb-0">Yêu cầu: {data.title || data.typeKey}</h3>
-          <small className="text-muted">ID: {data._id}</small>
+          <h2 className="mb-1">
+            {data.title || <span className="text-muted fst-italic">(Không tiêu đề)</span>}
+          </h2>
+          <div className="text-muted small">
+            Mã yêu cầu: <code>{data._id}</code>
+          </div>
         </div>
         <div className="d-flex gap-2">
-          <Link to={-1 as any} className="btn btn-outline-secondary btn-sm">
+          <button className="btn btn-outline-secondary" onClick={() => navigate(-1)}>
             ← Quay lại
-          </Link>
+          </button>
           {canApprove && (
             <>
               <button
-                className="btn btn-success btn-sm"
+                className="btn btn-success"
                 onClick={() => doAction('approve')}
                 disabled={actionLoading}
               >
-                ✅ Duyệt
+                {actionLoading ? 'Đang xử lý...' : '✅ Duyệt'}
               </button>
               <button
-                className="btn btn-outline-danger btn-sm"
+                className="btn btn-outline-danger"
                 onClick={() => doAction('reject')}
                 disabled={actionLoading}
               >
@@ -182,138 +178,137 @@ export default function RequestDetail() {
         </div>
       </div>
 
-      {/* top cards */}
-      <div className="row g-3 mb-3">
-        {/* info */}
-        <div className="col-md-4">
-          <div className="card h-100">
+      <div className="row g-4">
+        {/* Left Column: Info & Content */}
+        <div className="col-md-8">
+          <div className="card mb-4 shadow-sm">
+            <div className="card-header bg-light fw-bold">Thông tin chung</div>
             <div className="card-body">
-              <h6 className="text-uppercase text-muted mb-2">THÔNG TIN</h6>
-              <p className="mb-1">
-                <strong>Loại:</strong> {data.typeKey}
-              </p>
-              <p className="mb-1">
-                <strong>Danh mục:</strong> {data.category}
-              </p>
-              <p className="mb-1">
-                <strong>Ưu tiên:</strong>{' '}
-                <span className="badge text-bg-info">{data.priority || '—'}</span>
-              </p>
-              <p className="mb-1">
-                <strong>Trạng thái duyệt:</strong>{' '}
-                <span
-                  className={
-                    'badge ' +
-                    (approvalStatus === 'APPROVED'
-                      ? 'text-bg-success'
-                      : approvalStatus === 'REJECTED'
-                      ? 'text-bg-danger'
-                      : 'text-bg-secondary')
-                  }
-                >
-                  {approvalStatus}
-                </span>
-              </p>
-              <p className="mb-0">
-                <strong>Trạng thái:</strong>{' '}
-                <span className="badge text-bg-secondary">{data.status}</span>
+              <div className="row g-3">
+                <div className="col-sm-6">
+                  <label className="text-muted small">Loại yêu cầu</label>
+                  <div>{data.typeKey}</div>
+                </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">Danh mục</label>
+                  <div><span className="badge bg-secondary">{data.category}</span></div>
+                </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">Mức độ ưu tiên</label>
+                  <div>
+                    {data.priority ? (
+                      <span className={`badge ${data.priority === 'URGENT' ? 'bg-danger' : data.priority === 'HIGH' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                        {data.priority}
+                      </span>
+                    ) : '—'}
+                  </div>
+                </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">Trạng thái</label>
+                  <div><span className="badge bg-primary">{data.status}</span></div>
+                </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">Người tạo</label>
+                  <div className="text-truncate" title={(data.requester as any)?.email}>
+                    {/* Hiển thị tên người tạo nếu có, ngược lại hiển thị ID */}
+                    {(data.requester as any)?.name || String(data.requester)}
+                    {isMine && <span className="badge bg-light text-dark ms-1 border">Tôi</span>}
+                  </div>
+                </div>
+                <div className="col-sm-6">
+                  <label className="text-muted small">Ngày tạo</label>
+                  <div>{formatDate(data.createdAt)}</div>
+                </div>
+              </div>
+
+              <hr className="my-3" />
+
+              <h6 className="fw-bold mb-2">Mô tả</h6>
+              <p className="mb-0 text-break" style={{ whiteSpace: 'pre-wrap' }}>
+                {data.description || <span className="text-muted fst-italic">Không có mô tả</span>}
               </p>
             </div>
           </div>
-        </div>
 
-        {/* content */}
-        <div className="col-md-4">
-          <div className="card h-100">
+          <div className="card shadow-sm">
+            <div className="card-header bg-light fw-bold">Dữ liệu chi tiết</div>
             <div className="card-body">
-              <h6 className="text-uppercase text-muted mb-2">NỘI DUNG</h6>
-              <p className="mb-1">
-                <strong>Tiêu đề:</strong> {data.title || '—'}
-              </p>
-              <p className="mb-1">
-                <strong>Mô tả:</strong> {data.description || '—'}
-              </p>
-              <p className="mb-1">
-                <strong>Tạo lúc:</strong> {formatDate(data.createdAt)}
-              </p>
-              <p className="mb-0">
-                <strong>Cập nhật:</strong> {formatDate(data.updatedAt)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* custom */}
-        <div className="col-md-4">
-          <div className="card h-100">
-            <div className="card-body">
-              <h6 className="text-uppercase text-muted mb-2">DỮ LIỆU GỬI LÊN</h6>
               {renderCustom()}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* approval timeline */}
-      <div className="card mb-3">
-        <div className="card-body">
-          <h6 className="text-uppercase text-muted mb-3">QUY TRÌNH DUYỆT</h6>
-          {approvals.length === 0 && (
-            <p className="mb-0 text-muted">Yêu cầu này không cần duyệt.</p>
-          )}
-          {approvals.length > 0 && (
+        {/* Right Column: Approval Workflow */}
+        <div className="col-md-4">
+          <div className="card shadow-sm mb-4">
+            <div className="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+              <span>Quy trình duyệt</span>
+              <span
+                className={
+                  'badge ' +
+                  (approvalStatus === 'APPROVED'
+                    ? 'bg-success'
+                    : approvalStatus === 'REJECTED'
+                    ? 'bg-danger'
+                    : 'bg-warning text-dark')
+                }
+              >
+                {approvalStatus}
+              </span>
+            </div>
             <ul className="list-group list-group-flush">
-              {approvals.map((a: any) => {
-                const isCurrent = a.level === nextLevel && !a.decision;
-                return (
-                  <li key={a.level} className="list-group-item d-flex justify-content-between">
-                    <div>
-                      <div>
-                        <strong>Cấp {a.level}</strong> – {a.role}
-                        {isCurrent && <span className="badge bg-warning ms-2">Đang chờ bạn</span>}
+              {approvals.length === 0 ? (
+                <li className="list-group-item text-muted fst-italic">Không yêu cầu duyệt.</li>
+              ) : (
+                approvals.map((a: any, idx: number) => {
+                  const isCurrentStep = !a.decision && a.level === nextLevel && approvalStatus !== 'REJECTED';
+                  return (
+                    <li key={idx} className={`list-group-item ${isCurrentStep ? 'bg-primary-subtle' : ''}`}>
+                      <div className="d-flex justify-content-between align-items-center mb-1">
+                        <strong>Cấp {a.level}: {a.role}</strong>
+                        {a.decision ? (
+                          <span className={`badge ${a.decision === 'APPROVED' ? 'bg-success' : 'bg-danger'}`}>
+                            {a.decision}
+                          </span>
+                        ) : (
+                          <span className="badge bg-secondary">PENDING</span>
+                        )}
                       </div>
                       {a.decision && (
                         <div className="small text-muted">
-                          {a.decision} bởi {a.approver} lúc {formatDate(a.approvedAt)}
-                          {a.comment ? ` – "${a.comment}"` : ''}
+                          Bởi: {(a.approver as any)?.name || a.approver} <br />
+                          Lúc: {formatDate(a.approvedAt)}
+                          {a.comment && <div className="mt-1 fst-italic">"{a.comment}"</div>}
                         </div>
                       )}
-                    </div>
-                    <div>
-                      {a.decision ? (
-                        <span
-                          className={'badge ' + (a.decision === 'APPROVED' ? 'bg-success' : 'bg-danger')}
-                        >
-                          {a.decision}
-                        </span>
-                      ) : (
-                        <span className="badge bg-secondary">PENDING</span>
+                      {isCurrentStep && (
+                        <div className="small text-primary fw-bold">
+                          {canApprove ? '👉 Đang chờ bạn duyệt' : '⏳ Đang chờ duyệt'}
+                        </div>
                       )}
-                    </div>
-                  </li>
-                );
-              })}
+                    </li>
+                  );
+                })
+              )}
             </ul>
+          </div>
+
+          {canApprove && (
+            <div className="card shadow-sm border-primary">
+              <div className="card-body">
+                <label className="form-label fw-bold">Ghi chú duyệt / từ chối</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder="Nhập lý do hoặc ghi chú..."
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
+              </div>
+            </div>
           )}
         </div>
       </div>
-
-      {/* action box (chỉ nhập note) */}
-      {canApprove && (
-        <div className="card">
-          <div className="card-body">
-            <h6 className="text-uppercase text-muted mb-2">Ghi chú</h6>
-            <textarea
-              className="form-control mb-2"
-              rows={3}
-              placeholder="Nhập ghi chú khi duyệt / từ chối"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-            {/* không có nút ở đây */}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
