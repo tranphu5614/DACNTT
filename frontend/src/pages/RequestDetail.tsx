@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import { apiGetCatalog, CatalogItem, CatalogField } from '../api/catalog'; 
 
 function formatDate(v?: string) {
   if (!v) return '—';
@@ -12,39 +13,78 @@ function formatDate(v?: string) {
   }
 }
 
+interface RequestData {
+    _id: string;
+    category: 'HR' | 'IT';
+    typeKey: string;
+    title?: string;
+    description?: string;
+    priority?: string;
+    status: string;
+    custom?: Record<string, any>;
+    requester: any; 
+    attachments?: any[];
+    approvalStatus: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+    currentApprovalLevel: number;
+    approvals: any[];
+    createdAt: string;
+    updatedAt: string;
+}
+
 export default function RequestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<RequestData | null>(null); 
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [catalogItem, setCatalogItem] = useState<CatalogItem | null>(null); 
+
   useEffect(() => {
     if (!token) return;
-    (async () => {
+
+    const loadData = async () => {
       try {
-        const res = await api.get(`/requests/${id}`, {
+        const res = await api.get<RequestData>(`/requests/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setData(res.data);
+        const requestData = res.data; 
+        setData(requestData);
+        
+        if (requestData?.category && requestData?.typeKey) {
+            const catalog = await apiGetCatalog(token, requestData.category);
+            const foundItem = catalog.find(c => c.typeKey === requestData.typeKey);
+            setCatalogItem(foundItem ?? null);
+        }
+
         setError(null);
       } catch (e: any) {
         setError(e?.response?.data?.message || 'Không tải được yêu cầu');
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    loadData();
   }, [id, token]);
 
   const reload = async () => {
+    if (!token || !id) return;
     try {
-      const res = await api.get(`/requests/${id}`, {
+      const res = await api.get<RequestData>(`/requests/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setData(res.data);
+      const requestData = res.data; 
+      setData(requestData);
+      
+      if (requestData?.category && requestData?.typeKey && !catalogItem) {
+        const catalog = await apiGetCatalog(token, requestData.category);
+        const foundItem = catalog.find(c => c.typeKey === requestData.typeKey);
+        setCatalogItem(foundItem ?? null);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -64,6 +104,7 @@ export default function RequestDetail() {
       </div>
     );
   }
+  
   if (!data) return null;
 
   const approvals = data.approvals || [];
@@ -71,7 +112,6 @@ export default function RequestDetail() {
   const currentLevel = data.currentApprovalLevel || 0;
   const myRoles: string[] = user?.roles || [];
 
-  // Kiểm tra xem đây có phải là yêu cầu của chính mình không (hỗ trợ cả khi requester là object hoặc string ID)
   const isMine = user?._id === data.requester || user?._id === (data.requester as any)?._id;
 
   const nextLevel = currentLevel + 1;
@@ -87,7 +127,6 @@ export default function RequestDetail() {
     (approvals.length === 0 || approvalStatus === 'NONE') &&
     (myRoles.includes('ADMIN') || myRoles.includes('HR_MANAGER') || myRoles.includes('IT_MANAGER'));
 
-  // Chỉ cho phép duyệt nếu KHÔNG PHẢI là yêu cầu của mình (!isMine)
   const canApprove = !isMine && (canApproveNormal || canApproveForce);
 
   const doAction = async (type: 'approve' | 'reject') => {
@@ -111,29 +150,48 @@ export default function RequestDetail() {
 
   const renderCustom = () => {
     const c = data.custom || {};
+    const fieldMap = new Map<string, CatalogField>();
+    
+    if (catalogItem) {
+        catalogItem.fields.forEach(f => fieldMap.set(f.key, f as CatalogField));
+    }
+    
+    // [UPDATED] Hiển thị thông tin phòng họp mới (Ngày + Giờ)
     if (data.typeKey === 'meeting_room_booking') {
       return (
         <dl className="row mb-0">
           <dt className="col-sm-4 text-muted">Loại phòng</dt>
           <dd className="col-sm-8">{c.size || '—'}</dd>
-          <dt className="col-sm-4 text-muted">Bắt đầu</dt>
-          <dd className="col-sm-8">{c.start ? new Date(c.start).toLocaleString() : '—'}</dd>
-          <dt className="col-sm-4 text-muted">Kết thúc</dt>
-          <dd className="col-sm-8">{c.end ? new Date(c.end).toLocaleString() : '—'}</dd>
+          
+          <dt className="col-sm-4 text-muted">Ngày đặt</dt>
+          <dd className="col-sm-8">
+            {c.bookingDate ? new Date(c.bookingDate).toLocaleDateString() : '—'}
+          </dd>
+          
+          <dt className="col-sm-4 text-muted">Thời gian</dt>
+          <dd className="col-sm-8">
+            {c.fromTime ? c.fromTime : '—'} ➔ {c.toTime ? c.toTime : '—'}
+          </dd>
+          
           <dt className="col-sm-4 text-muted">Phòng</dt>
           <dd className="col-sm-8 fw-bold text-primary">{c.roomKey || '—'}</dd>
         </dl>
       );
     }
+
     const keys = Object.keys(c);
     if (!keys.length) return <p className="mb-0 text-muted">Không có dữ liệu bổ sung.</p>;
     return (
       <dl className="row mb-0">
         {keys.map((k) => (
           <React.Fragment key={k}>
-            <dt className="col-sm-4 text-muted text-truncate" title={k}>{k}</dt>
+            <dt className="col-sm-4 text-muted text-truncate" title={k}>
+              {fieldMap.get(k)?.label || k}
+            </dt>
             <dd className="col-sm-8 text-break">
-              {typeof c[k] === 'object' ? JSON.stringify(c[k]) : String(c[k])}
+              {fieldMap.get(k)?.type === 'date' && c[k] ? new Date(c[k]).toLocaleDateString() : 
+               fieldMap.get(k)?.type === 'datetime' && c[k] ? new Date(c[k]).toLocaleString() :
+               typeof c[k] === 'object' ? JSON.stringify(c[k]) : String(c[k])}
             </dd>
           </React.Fragment>
         ))}
@@ -143,7 +201,6 @@ export default function RequestDetail() {
 
   return (
     <div className="container py-4" style={{ maxWidth: 900 }}>
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-start mb-4">
         <div>
           <h2 className="mb-1">
@@ -179,7 +236,6 @@ export default function RequestDetail() {
       </div>
 
       <div className="row g-4">
-        {/* Left Column: Info & Content */}
         <div className="col-md-8">
           <div className="card mb-4 shadow-sm">
             <div className="card-header bg-light fw-bold">Thông tin chung</div>
@@ -210,7 +266,6 @@ export default function RequestDetail() {
                 <div className="col-sm-6">
                   <label className="text-muted small">Người tạo</label>
                   <div className="text-truncate" title={(data.requester as any)?.email}>
-                    {/* Hiển thị tên người tạo nếu có, ngược lại hiển thị ID */}
                     {(data.requester as any)?.name || String(data.requester)}
                     {isMine && <span className="badge bg-light text-dark ms-1 border">Tôi</span>}
                   </div>
@@ -238,7 +293,6 @@ export default function RequestDetail() {
           </div>
         </div>
 
-        {/* Right Column: Approval Workflow */}
         <div className="col-md-4">
           <div className="card shadow-sm mb-4">
             <div className="card-header bg-light fw-bold d-flex justify-content-between align-items-center">

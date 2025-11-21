@@ -39,8 +39,12 @@ export function apiCreateRequest(
     typeKey: string;
     title: string;
     description: string;
-    priority: RequestPriority | ''; // [UPDATED] Cho phép chuỗi rỗng
+    priority: RequestPriority | ''; 
     custom: Record<string, any>;
+    // [UPDATED] Bổ sung các trường booking vào Type Definition
+    bookingStart?: string;
+    bookingEnd?: string;
+    bookingRoomKey?: string;
     files?: File[];
   }
 ) {
@@ -52,15 +56,18 @@ export function apiCreateRequest(
   fd.append('title', payload.title);
   fd.append('description', payload.description);
 
-  // [UPDATED] Chỉ gửi priority nếu người dùng đã chọn (không phải chuỗi rỗng)
   if (payload.priority) {
     fd.append('priority', payload.priority);
   }
 
+  // [UPDATED] Append dữ liệu booking vào FormData để gửi lên Backend
+  if (payload.bookingStart) fd.append('bookingStart', payload.bookingStart);
+  if (payload.bookingEnd) fd.append('bookingEnd', payload.bookingEnd);
+  if (payload.bookingRoomKey) fd.append('bookingRoomKey', payload.bookingRoomKey);
+
   fd.append('custom', JSON.stringify(payload.custom || {}));
   (payload.files || []).forEach((f) => fd.append('files', f));
 
-  // BE tự lấy requester từ JWT
   return request<any>('/requests', { method: 'POST', body: fd }, token);
 }
 
