@@ -27,15 +27,21 @@ export class RequestsService {
     return DEFAULT_CATALOG.find((c) => c.typeKey === typeKey);
   }
 
-  async getAvailableRooms(startISO: string, endISO: string, size: RoomSize) {
+  // [UPDATED] Trả về danh sách phòng kèm trạng thái isBusy
+  async getAvailableRooms(dateStr: string, fromStr: string, toStr: string, size: RoomSize) {
+    if (!dateStr || !fromStr || !toStr) return [];
+
+    const startISO = `${dateStr}T${fromStr}:00`;
+    const endISO = `${dateStr}T${toStr}:00`;
+
     const start = new Date(startISO);
     const end = new Date(endISO);
 
     if (isNaN(+start) || isNaN(+end)) {
-      throw new BadRequestException('start/end không hợp lệ');
+      throw new BadRequestException('Thời gian không hợp lệ');
     }
     if (end <= start) {
-      throw new BadRequestException('end phải sau start');
+      throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu');
     }
 
     const busy = (await this.model
@@ -53,7 +59,16 @@ export class RequestsService {
       (busy || []).map((b: BusyDoc) => b.bookingRoomKey).filter(Boolean),
     );
 
-    return ROOMS.filter((r) => r.size === size && !busyKeys.has(r.key));
+    // Thay vì filter, ta map để trả về full danh sách kèm trạng thái
+    return ROOMS
+      .filter((r) => r.size === size)
+      .map((r) => ({
+        ...r,
+        isBusy: busyKeys.has(r.key), // True nếu phòng đang bận
+        // Các trường hỗ trợ mapping FE
+        value: r.key,
+        label: r.name
+      }));
   }
 
   async createWithRequester(
@@ -69,24 +84,22 @@ export class RequestsService {
       }
     }
 
-    // === [AUTO-PRIORITY AI] ===
+    // ... (Giữ nguyên logic AI Auto-Priority)
     if (!dto.priority) {
       const textParts = [dto.title, dto.description].filter(Boolean);
       const textToAnalyze = textParts.join('. ');
 
-      // Chỉ chạy AI nếu có nội dung đủ dài để phân tích (ví dụ >= 5 ký tự)
       if (textToAnalyze && textToAnalyze.trim().length >= 5) {
         const suggested = await this.priorityClassifier.suggestPriority(textToAnalyze);
         if (suggested) {
           dto.priority = suggested;
         } else {
-          dto.priority = 'MEDIUM'; // AI không chắc chắn
+          dto.priority = 'MEDIUM';
         }
       } else {
-        dto.priority = 'MEDIUM'; // Không đủ thông tin
+        dto.priority = 'MEDIUM';
       }
     }
-    // === [END AUTO-PRIORITY] ===
 
     const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
     const approvalsFromCatalog =
@@ -99,25 +112,29 @@ export class RequestsService {
 
     if (dto?.category === 'HR' && dto?.typeKey === 'meeting_room_booking') {
       const c = dto.custom || {};
-      const { size, start, end, roomKey } = c;
+      const { size, bookingDate, fromTime, toTime, roomKey } = c;
 
-      if (!size || !start || !end || !roomKey) {
-        throw new BadRequestException('Thiếu size/start/end/roomKey');
+      if (!size || !bookingDate || !fromTime || !toTime || !roomKey) {
+        throw new BadRequestException('Thiếu thông tin đặt phòng (size, date, time, room)');
       }
 
-      const startDt = new Date(start);
-      const endDt = new Date(end);
+      const startDt = new Date(`${bookingDate}T${fromTime}:00`);
+      const endDt = new Date(`${bookingDate}T${toTime}:00`);
 
       if (isNaN(+startDt) || isNaN(+endDt) || endDt <= startDt) {
         throw new BadRequestException('Khoảng thời gian không hợp lệ');
       }
 
-      const available = await this.getAvailableRooms(start, end, size);
-      const stillAvailable = available.find((r) => r.key === roomKey);
-      if (!stillAvailable) {
-        throw new ConflictException(
-          'Phòng đã được giữ trong khoảng thời gian này, vui lòng chọn phòng khác.',
-        );
+      const conflict = await this.model.findOne({
+        typeKey: 'meeting_room_booking',
+        approvalStatus: { $ne: 'REJECTED' },
+        bookingRoomKey: roomKey,
+        bookingStart: { $lt: endDt },
+        bookingEnd: { $gt: startDt },
+      });
+
+      if (conflict) {
+        throw new ConflictException('Phòng đã bị đặt trong khung giờ này, vui lòng chọn lại.');
       }
 
       dto.bookingRoomKey = roomKey;
@@ -153,6 +170,7 @@ export class RequestsService {
     return doc;
   }
 
+  // ... (Giữ nguyên các hàm còn lại: listMine, listQueue, getById, etc.)
   async listMine(userId: string, page = 1, limit = 10) {
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
@@ -208,7 +226,7 @@ export class RequestsService {
     const doc = await this.model
       .findById(id)
       .populate('requester', 'name email')
-      .populate('approvals.approver', 'name email') // Populate thêm người duyệt để hiển thị tên họ
+      .populate('approvals.approver', 'name email')
       .exec();
     if (!doc) throw new NotFoundException('Request not found');
     return doc;
@@ -220,7 +238,7 @@ export class RequestsService {
 
     return this.model
       .find({
-        requester: { $ne: new Types.ObjectId(user._id) }, // Loại bỏ request của chính mình
+        requester: { $ne: new Types.ObjectId(user._id) },
         approvalStatus: { $in: ['PENDING', 'IN_REVIEW'] },
         approvals: {
           $elemMatch: {
@@ -239,7 +257,6 @@ export class RequestsService {
     const doc = await this.model.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
 
-    // Chặn tự duyệt
     if (doc.requester.toString() === user._id) {
       throw new ForbiddenException('Bạn không thể tự duyệt yêu cầu của mình');
     }
@@ -282,7 +299,6 @@ export class RequestsService {
     const doc = await this.model.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
 
-    // Chặn tự từ chối
     if (doc.requester.toString() === user._id) {
       throw new ForbiddenException('Bạn không thể tự duyệt/từ chối yêu cầu của mình');
     }

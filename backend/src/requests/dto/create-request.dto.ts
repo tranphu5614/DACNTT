@@ -6,6 +6,7 @@ import {
   IsString,
   IsDateString,
 } from 'class-validator';
+import { Transform } from 'class-transformer'; // [UPDATED] Import Transform
 
 const CATEGORY_VALUES = ['HR', 'IT'] as const;
 const PRIORITY_VALUES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
@@ -17,7 +18,6 @@ export class CreateRequestDto {
   @IsString()
   typeKey!: string;
 
-  // có form động nên title/description đôi khi FE không gửi → để optional
   @IsOptional()
   @IsString()
   title?: string;
@@ -30,12 +30,24 @@ export class CreateRequestDto {
   @IsEnum(PRIORITY_VALUES)
   priority?: (typeof PRIORITY_VALUES)[number];
 
-  // payload động
-  @IsObject()
+  // [UPDATED] Thêm @Transform để parse chuỗi JSON từ FormData thành Object
   @IsOptional()
+  @Transform(({ value }) => {
+    // Nếu là string (do FormData gửi lên), thử parse JSON
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+    }
+    // Nếu đã là object (trường hợp gửi JSON raw), giữ nguyên
+    return value;
+  })
+  @IsObject()
   custom?: Record<string, any>;
 
-  // --- dành cho booking phòng họp (FE có thể gửi thẳng, service sẽ map) ---
+  // --- booking phòng họp ---
   @IsOptional()
   @IsString()
   bookingRoomKey?: string;

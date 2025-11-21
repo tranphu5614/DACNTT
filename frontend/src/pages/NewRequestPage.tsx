@@ -1,72 +1,53 @@
-// frontend/src/pages/NewRequestPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request as apiRequest } from '../api/request';
 import { apiCreateRequest } from '../api/requests';
 import { apiSuggestKnowledge, KnowledgeSuggestion } from '../api/ai';
+import {
+  CatalogItem,
+  DynamicSelectField,
+  StaticSelectOption,
+  CatalogField,
+  RoomSelectorField,
+} from '../api/catalog';
+import RequestDynamicFields from '../components/RequestDynamicFields';
 
-type SelectOption = { value: string; label: string };
+type SelectOption = StaticSelectOption;
 
-type StaticSelectField = {
-  key: string;
-  label: string;
-  type: 'select';
-  required?: boolean;
-  options: SelectOption[];
-};
-
-type DynamicSelectField = {
-  key: string;
-  label: string;
-  type: 'select';
-  required?: boolean;
-  optionsUrlTemplate: string;
-};
-
-type BaseField =
-  | { key: string; label: string; type: 'text' | 'textarea' | 'date' | 'number' | 'datetime'; required?: boolean };
-
-type CatalogField = BaseField | StaticSelectField | DynamicSelectField;
-
-type CatalogItem = {
+// Định nghĩa Type rõ ràng cho state form
+type FormState = {
   category: 'HR' | 'IT';
   typeKey: string;
   title: string;
-  fields: CatalogField[];
+  custom: Record<string, any>;
 };
-
-type Room = { key: string; name: string; size: 'SMALL' | 'LARGE' };
 
 export default function NewRequestPage() {
   const navigate = useNavigate();
   const [token, setToken] = useState<string>('');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [form, setForm] = useState<{
-    category: 'HR' | 'IT';
-    typeKey: string;
-    title: string;
-    // Đã bỏ description và priority khỏi state form UI
-    custom: Record<string, any>;
-  }>({
+  
+  const [form, setForm] = useState<FormState>({
     category: 'HR',
     typeKey: '',
     title: '',
     custom: {},
   });
 
+  // State lưu options cho dynamic select (bao gồm cả danh sách phòng)
   const [remoteOptions, setRemoteOptions] = useState<Record<string, SelectOption[]>>({});
   const [loadingRemote, setLoadingRemote] = useState<Record<string, boolean>>({});
+  
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
   const [aiSuggestions, setAiSuggestions] = useState<KnowledgeSuggestion[]>([]);
-
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setToken(localStorage.getItem('token') || '');
   }, []);
 
+  // Hàm thay thế biến trong URL template (ví dụ: {custom.size})
   function buildUrlFromTemplate(tpl: string): string {
     return tpl.replace(/\{([^}]+)\}/g, (_m, expr: string) => {
       try {
@@ -81,7 +62,12 @@ export default function NewRequestPage() {
     });
   }
 
+  // Helper convert sang ISO string
   function toISO(v: string): string {
+    if (v && v.includes('T')) {
+        const [datePart, timePart] = v.split('T');
+        return new Date(`${datePart}T${timePart}:00`).toISOString();
+    }
     return v ? new Date(v).toISOString() : '';
   }
 
@@ -90,7 +76,7 @@ export default function NewRequestPage() {
     [catalog, form.typeKey],
   );
 
-  // AI Suggestion chỉ dựa trên Title
+  // AI Suggestion (Gợi ý khi nhập tiêu đề)
   useEffect(() => {
     if (!token || form.category !== 'IT' || !form.title || form.title.trim().length < 3) {
       setAiSuggestions([]);
@@ -105,7 +91,7 @@ export default function NewRequestPage() {
     return () => clearTimeout(timer);
   }, [token, form.category, form.title]);
 
-  // Load catalog
+  // Load Catalog khi thay đổi Category
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -121,6 +107,7 @@ export default function NewRequestPage() {
 
         setCatalog(data || []);
 
+        // Nếu typeKey hiện tại không nằm trong catalog mới, reset về item đầu tiên
         if (!data?.find((x) => x.typeKey === form.typeKey)) {
           const first = data?.[0];
           setForm((old) => ({
@@ -142,24 +129,29 @@ export default function NewRequestPage() {
     };
   }, [token, form.category]);
 
-  // Load dynamic fields
+  // Load Dynamic Fields (bao gồm danh sách phòng)
   useEffect(() => {
     if (!token || !current) return;
     let cancelled = false;
 
     const fetchField = async (f: CatalogField) => {
-      if (f.type !== 'select' || !(f as DynamicSelectField).optionsUrlTemplate) return;
+      // Chỉ xử lý các field có optionsUrlTemplate (select hoặc room_selector)
+      if ((f.type !== 'select' && f.type !== 'room_selector') || !('optionsUrlTemplate' in f)) return;
+      
+      const dynField = f as DynamicSelectField | RoomSelectorField;
+      const url = buildUrlFromTemplate(dynField.optionsUrlTemplate);
 
-      const url = buildUrlFromTemplate((f as DynamicSelectField).optionsUrlTemplate);
-
-      if (/\{[^}]+\}/.test(url)) {
+      // Nếu URL chưa đủ tham số (vẫn còn {template}), chưa gọi API
+      if (/[^a-zA-Z0-9]\{[^}]+?\}/.test(url)) {
         setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
         return;
       }
 
       try {
         setLoadingRemote((prev) => ({ ...prev, [f.key]: true }));
-        const data = await apiRequest<Array<Room | { key?: string; name?: string; value?: string; label?: string }>>(
+        
+        // Gọi API, response có thể chứa isBusy
+        const data = await apiRequest<Array<{ key?: string; name?: string; value?: string; label?: string; isBusy?: boolean }>>(
           url,
           { method: 'GET' },
           token,
@@ -169,10 +161,12 @@ export default function NewRequestPage() {
         const mapped: SelectOption[] = (data || []).map((d: any) => ({
           value: String(d.value ?? d.key ?? ''),
           label: String(d.label ?? d.name ?? d.value ?? d.key ?? ''),
+          isBusy: !!d.isBusy, // Map trạng thái bận
         }));
 
         setRemoteOptions((prev) => ({ ...prev, [f.key]: mapped }));
 
+        // Nếu giá trị đang chọn không còn trong danh sách mới (hoặc bị bận), reset
         if (form.custom?.[f.key] && !mapped.find((m) => m.value === form.custom[f.key])) {
           setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: '' } }));
         }
@@ -185,16 +179,18 @@ export default function NewRequestPage() {
 
     (async () => {
       for (const f of current.fields) {
-        await fetchField(f);
+        if ((f.type === 'select' || f.type === 'room_selector') && 'optionsUrlTemplate' in f) {
+          await fetchField(f);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [token, current, form.typeKey, form.custom?.start, form.custom?.end, form.custom?.size]);
+    // Dependencies: Chạy lại khi token, loại form, hoặc dữ liệu nhập thay đổi (để cập nhật URL template)
+  }, [token, current, form.typeKey, JSON.stringify(form.custom)]);
 
-  // --- SUBMIT FORM ---
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
@@ -208,18 +204,37 @@ export default function NewRequestPage() {
 
     try {
       const normalizedCustom = { ...form.custom };
-      if (normalizedCustom.start) normalizedCustom.start = toISO(normalizedCustom.start);
-      if (normalizedCustom.end) normalizedCustom.end = toISO(normalizedCustom.end);
+      let derivedStart = undefined;
+      let derivedEnd = undefined;
 
+      // Xử lý đặc biệt cho Đặt phòng họp: Ghép ngày + giờ
+      if (form.typeKey === 'meeting_room_booking') {
+          const { bookingDate, fromTime, toTime } = normalizedCustom;
+          if (bookingDate && fromTime && toTime) {
+              derivedStart = new Date(`${bookingDate}T${fromTime}:00`).toISOString();
+              derivedEnd = new Date(`${bookingDate}T${toTime}:00`).toISOString();
+          }
+      } else {
+          // Xử lý chuẩn cho các form khác có datetime/date
+          current?.fields.forEach(f => {
+            if (f.key in normalizedCustom && (f.type === 'date' || f.type === 'datetime') && normalizedCustom[f.key]) {
+                normalizedCustom[f.key] = toISO(normalizedCustom[f.key]);
+            }
+          });
+      }
+      
       const files = fileInputRef.current?.files ? Array.from(fileInputRef.current.files) : [];
 
       await apiCreateRequest(token, {
         category: form.category,
         typeKey: form.typeKey,
         title: form.title || current?.title || '',
-        description: '', // Luôn gửi rỗng
-        priority: '',    // Luôn gửi rỗng để BE tự chạy AI
+        description: '', 
+        priority: '',    
         custom: normalizedCustom,
+        bookingStart: derivedStart, 
+        bookingEnd: derivedEnd,
+        bookingRoomKey: normalizedCustom.roomKey, // mapping key phòng
         files,
       });
 
@@ -320,97 +335,15 @@ export default function NewRequestPage() {
             )}
           </div>
 
-          {current.fields.map((f) => {
-            if (f.type === 'select') {
-              const dynTpl = (f as DynamicSelectField).optionsUrlTemplate;
-              const isDynamic = typeof dynTpl === 'string' && dynTpl.length > 0;
-              const options: SelectOption[] = isDynamic
-                ? remoteOptions[f.key] || []
-                : (f as StaticSelectField).options;
-
-              const isLoading = !!loadingRemote[f.key];
-
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <select
-                    className="form-select"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                    disabled={isDynamic && (isLoading || options.length === 0)}
-                  >
-                    <option value="">
-                      {isDynamic ? (isLoading ? 'Đang tải...' : '-- Chọn --') : '-- Chọn --'}
-                    </option>
-                    {options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  {isDynamic && !isLoading && options.length === 0 && (
-                    <div className="form-text text-danger">
-                      Không có lựa chọn phù hợp.
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            const commonProps = {
-              className: 'form-control',
-              required: !!f.required,
-              value: form.custom?.[f.key] ?? '',
-              onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } })),
-            };
-
-            if (f.type === 'datetime') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="datetime-local" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'date') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="date" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'number') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="number" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'text') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="text" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'textarea') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <textarea rows={3} {...commonProps} />
-                </div>
-              );
-            }
-
-            return null;
-          })}
+          {/* Render Form Động từ Catalog */}
+          <RequestDynamicFields
+            fields={current.fields}
+            value={form.custom}
+            onChange={(custom) => setForm((old) => ({ ...old, custom }))}
+            disabled={loading}
+            dynamicOptions={remoteOptions}
+            loadingRemote={loadingRemote}
+          />
 
           <div className="mb-3">
             <label className="form-label">Tệp đính kèm</label>

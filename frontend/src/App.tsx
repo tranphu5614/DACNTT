@@ -73,7 +73,7 @@ export default function App() {
           <Sidebar variant="static" />
         </div>
 
-        <div className="col-12 col-lg-10 p-3">
+        <div className="col-12 col-lg-10 p-4 bg-light min-vh-100">
           <Routes>
             {/* Logged-in area */}
             <Route element={<ProtectedRoute />}>
