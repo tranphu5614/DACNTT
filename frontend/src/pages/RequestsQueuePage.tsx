@@ -45,7 +45,6 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, category]);
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const onFilter = async (e: React.FormEvent) => {
     e.preventDefault();
