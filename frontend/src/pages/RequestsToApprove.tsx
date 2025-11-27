@@ -1,5 +1,5 @@
 // frontend/src/pages/RequestsToApprove.tsx
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../utils/api';
 
 export default function RequestsToApprove() {

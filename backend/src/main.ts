@@ -13,7 +13,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
 
   app.use(cors({
-    origin: [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/],
+    origin: [
+      'http://localhost',              // Cho phép Frontend chạy port 80 (Docker)
+      /^http:\/\/localhost:\d+$/,      // Cho phép localhost có port bất kỳ (Dev mode)
+      /^http:\/\/127\.0\.0\.1:\d+$/    // Cho phép IP loopback
+    ],
     credentials: true,
     methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']

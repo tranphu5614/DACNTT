@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # 1. Database MongoDB
+  mongodb:
+    image: mongo:6.0
+    container_name: reqsys_mongo
+    restart: always
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  # 2. Backend (NestJS)
+  backend:
+    build: ./backend
+    container_name: reqsys_backend
+    restart: always
+    depends_on:
+      - mongodb
+    environment:
+      - PORT=3000
+      # Kết nối tới service 'mongodb' thay vì 'localhost'
+      - MONGO_URI=mongodb://mongodb:27017/reqsys
+      - JWT_SECRET=supersecret_key_change_this
+      - GEMINI_API_KEY= AIzaSyBf6x6X4Bj2ADbr1YIq-hGI6HYSPvvkyEA
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+  # 3. Frontend (React)
+  frontend:
+    build: ./frontend
+    container_name: reqsys_frontend
+    restart: always
+    ports:
+      - "80:80" # Truy cập web ở http://localhost
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
