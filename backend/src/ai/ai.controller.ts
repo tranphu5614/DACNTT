@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PriorityClassifierService } from './priority-classifier.service';
@@ -16,5 +16,13 @@ export class AiController {
     return this.knowledgeService.autocomplete(query);
   }
 
-  // Đã xóa endpoint @Get('complete')
+  // --- Endpoint Chatbot ---
+  @Post('chat')
+  async chat(@Req() req: any, @Body() body: { history: any[], message: string }) {
+    // Lấy userId từ request (do JwtAuthGuard gán vào)
+    const userId = req.user?.userId || req.user?.sub || req.user?._id;
+    
+    const reply = await this.knowledgeService.chat(body.history || [], body.message, userId);
+    return { reply };
+  }
 }
