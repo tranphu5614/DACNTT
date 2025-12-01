@@ -11,4 +11,10 @@ export function apiSuggestKnowledge(token: string, query: string) {
   return request<KnowledgeSuggestion[]>(`/ai/knowledge?q=${encodeURIComponent(query)}`, { method: 'GET' }, token);
 }
 
-// Đã xóa apiCompleteText
+// Gọi API Chat
+export function apiChat(token: string, history: any[], message: string) {
+  return request<{ reply: string }>('/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ history, message }),
+  }, token);
+}

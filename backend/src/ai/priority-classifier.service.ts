@@ -11,8 +11,6 @@ export class PriorityClassifierService implements OnModuleInit {
   constructor(private configService: ConfigService) {
     this.API_KEY = this.configService.get<string>('GEMINI_API_KEY') || '';
     
-    // URL mặc định an toàn nhất (gemini-pro thường luôn có)
-    // Chúng ta sẽ cập nhật URL này bằng hàm detectModel() khi server chạy
     this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`;
     
     if (!this.API_KEY) {
