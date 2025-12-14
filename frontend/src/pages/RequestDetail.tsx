@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import api from '../utils/api';
-import { useAuth } from '../context/AuthContext';
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../utils/api";
+import { useAuth } from "../context/AuthContext";
 
 function formatDate(v?: string) {
-  if (!v) return '—';
+  if (!v) return "—";
   try {
     return new Date(v).toLocaleString();
   } catch {
@@ -16,8 +16,9 @@ export default function RequestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { token, user } = useAuth();
+
   const [data, setData] = useState<any>(null);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +31,8 @@ export default function RequestDetail() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setData(res.data);
-        setError(null);
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Không tải được yêu cầu');
+        setError(e?.response?.data?.message || "Không tải được yêu cầu");
       } finally {
         setLoading(false);
       }
@@ -40,267 +40,217 @@ export default function RequestDetail() {
   }, [id, token]);
 
   const reload = async () => {
-    try {
-      const res = await api.get(`/requests/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setData(res.data);
-    } catch (e) {
-      console.error(e);
-    }
+    const res = await api.get(`/requests/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setData(res.data);
   };
 
   if (!token) return <div className="container py-4">Cần đăng nhập.</div>;
   if (loading) return <div className="container py-4">Đang tải...</div>;
-  if (error) {
+  if (error)
     return (
       <div className="container py-4">
-        <div className="alert alert-danger d-flex justify-content-between align-items-center">
-          <span>{error}</span>
-          <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(-1)}>
-            Quay lại
-          </button>
-        </div>
+        <div className="alert alert-danger">{error}</div>
       </div>
     );
-  }
-  if (!data) return null;
 
   const approvals = data.approvals || [];
-  const approvalStatus = data.approvalStatus || 'NONE';
+  const approvalStatus = data.approvalStatus || "NONE";
   const currentLevel = data.currentApprovalLevel || 0;
-  const myRoles: string[] = user?.roles || [];
 
-  // Kiểm tra xem đây có phải là yêu cầu của chính mình không (hỗ trợ cả khi requester là object hoặc string ID)
-  const isMine = user?._id === data.requester || user?._id === (data.requester as any)?._id;
+  const myRoles = user?.roles || [];
+  const isMine =
+    user?._id === data.requester ||
+    user?._id === (data.requester as any)?._id;
 
   const nextLevel = currentLevel + 1;
   const nextStep = approvals.find((a: any) => a.level === nextLevel);
 
-  const canApproveNormal =
-    approvalStatus !== 'APPROVED' &&
-    approvalStatus !== 'REJECTED' &&
-    nextStep &&
-    myRoles.includes(nextStep.role);
+  const canApprove =
+    !isMine &&
+    (approvalStatus === "NONE" ||
+      (nextStep && myRoles.includes(nextStep.role)));
 
-  const canApproveForce =
-    (approvals.length === 0 || approvalStatus === 'NONE') &&
-    (myRoles.includes('ADMIN') || myRoles.includes('HR_MANAGER') || myRoles.includes('IT_MANAGER'));
+  const doAction = async (type: "approve" | "reject") => {
+    if (
+      !confirm(
+        `Bạn chắc chắn muốn ${
+          type === "approve" ? "duyệt" : "từ chối"
+        } yêu cầu này?`
+      )
+    )
+      return;
 
-  // Chỉ cho phép duyệt nếu KHÔNG PHẢI là yêu cầu của mình (!isMine)
-  const canApprove = !isMine && (canApproveNormal || canApproveForce);
-
-  const doAction = async (type: 'approve' | 'reject') => {
-    if (!confirm(`Bạn chắc chắn muốn ${type === 'approve' ? 'duyệt' : 'từ chối'} yêu cầu này?`)) return;
     setActionLoading(true);
+
     try {
       await api.patch(
         `/requests/${id}/${type}`,
         { comment },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-      setComment('');
+      setComment("");
       await reload();
-      alert('Thao tác thành công!');
+      alert("Thành công!");
     } catch (e: any) {
-      alert(e?.response?.data?.message || 'Thao tác thất bại');
+      alert(e?.response?.data?.message || "Lỗi thao tác");
     } finally {
       setActionLoading(false);
     }
   };
 
-  const renderCustom = () => {
-    const c = data.custom || {};
-    if (data.typeKey === 'meeting_room_booking') {
-      return (
-        <dl className="row mb-0">
-          <dt className="col-sm-4 text-muted">Loại phòng</dt>
-          <dd className="col-sm-8">{c.size || '—'}</dd>
-          <dt className="col-sm-4 text-muted">Bắt đầu</dt>
-          <dd className="col-sm-8">{c.start ? new Date(c.start).toLocaleString() : '—'}</dd>
-          <dt className="col-sm-4 text-muted">Kết thúc</dt>
-          <dd className="col-sm-8">{c.end ? new Date(c.end).toLocaleString() : '—'}</dd>
-          <dt className="col-sm-4 text-muted">Phòng</dt>
-          <dd className="col-sm-8 fw-bold text-primary">{c.roomKey || '—'}</dd>
-        </dl>
-      );
-    }
-    const keys = Object.keys(c);
-    if (!keys.length) return <p className="mb-0 text-muted">Không có dữ liệu bổ sung.</p>;
-    return (
-      <dl className="row mb-0">
-        {keys.map((k) => (
-          <React.Fragment key={k}>
-            <dt className="col-sm-4 text-muted text-truncate" title={k}>{k}</dt>
-            <dd className="col-sm-8 text-break">
-              {typeof c[k] === 'object' ? JSON.stringify(c[k]) : String(c[k])}
-            </dd>
-          </React.Fragment>
-        ))}
-      </dl>
-    );
-  };
-
   return (
-    <div className="container py-4" style={{ maxWidth: 900 }}>
+    <div className="container py-4" style={{ maxWidth: 960 }}>
       {/* Header */}
       <div className="d-flex justify-content-between align-items-start mb-4">
         <div>
-          <h2 className="mb-1">
-            {data.title || <span className="text-muted fst-italic">(Không tiêu đề)</span>}
-          </h2>
+          <h2 className="fw-bold mb-1">{data.title}</h2>
           <div className="text-muted small">
-            Mã yêu cầu: <code>{data._id}</code>
+            <i className="bi bi-hash icon-label"></i> {data._id}
           </div>
         </div>
+
         <div className="d-flex gap-2">
-          <button className="btn btn-outline-secondary" onClick={() => navigate(-1)}>
+          <button
+            className="btn btn-outline-secondary"
+            onClick={() => navigate(-1)}
+          >
             ← Quay lại
           </button>
+
           {canApprove && (
             <>
               <button
                 className="btn btn-success"
-                onClick={() => doAction('approve')}
+                onClick={() => doAction("approve")}
                 disabled={actionLoading}
               >
-                {actionLoading ? 'Đang xử lý...' : '✅ Duyệt'}
+                {actionLoading ? "..." : "Duyệt"}
               </button>
               <button
                 className="btn btn-outline-danger"
-                onClick={() => doAction('reject')}
+                onClick={() => doAction("reject")}
                 disabled={actionLoading}
               >
-                ❌ Từ chối
+                Từ chối
               </button>
             </>
           )}
         </div>
       </div>
 
+      {/* Requester Info */}
+      <div className="requester-box mb-4">
+        <div className="requester-avatar">
+          {data.requester?.name?.[0]?.toUpperCase() || "U"}
+        </div>
+        <div>
+          <div className="fw-bold">{data.requester?.name}</div>
+          <div className="text-muted small">{data.requester?.email}</div>
+        </div>
+      </div>
+
       <div className="row g-4">
-        {/* Left Column: Info & Content */}
+        {/* LEFT – INFO */}
         <div className="col-md-8">
-          <div className="card mb-4 shadow-sm">
-            <div className="card-header bg-light fw-bold">Thông tin chung</div>
+          <div className="card shadow-sm mb-4">
+            <div className="card-header">Thông tin chung</div>
             <div className="card-body">
-              <div className="row g-3">
-                <div className="col-sm-6">
-                  <label className="text-muted small">Loại yêu cầu</label>
-                  <div>{data.typeKey}</div>
-                </div>
-                <div className="col-sm-6">
-                  <label className="text-muted small">Danh mục</label>
-                  <div><span className="badge bg-secondary">{data.category}</span></div>
-                </div>
-                <div className="col-sm-6">
-                  <label className="text-muted small">Mức độ ưu tiên</label>
-                  <div>
-                    {data.priority ? (
-                      <span className={`badge ${data.priority === 'URGENT' ? 'bg-danger' : data.priority === 'HIGH' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
-                        {data.priority}
-                      </span>
-                    ) : '—'}
-                  </div>
-                </div>
-                <div className="col-sm-6">
-                  <label className="text-muted small">Trạng thái</label>
-                  <div><span className="badge bg-primary">{data.status}</span></div>
-                </div>
-                <div className="col-sm-6">
-                  <label className="text-muted small">Người tạo</label>
-                  <div className="text-truncate" title={(data.requester as any)?.email}>
-                    {/* Hiển thị tên người tạo nếu có, ngược lại hiển thị ID */}
-                    {(data.requester as any)?.name || String(data.requester)}
-                    {isMine && <span className="badge bg-light text-dark ms-1 border">Tôi</span>}
-                  </div>
-                </div>
-                <div className="col-sm-6">
-                  <label className="text-muted small">Ngày tạo</label>
-                  <div>{formatDate(data.createdAt)}</div>
-                </div>
-              </div>
+              <dl className="row mb-0">
+                <dt className="col-sm-4 text-muted">Loại yêu cầu</dt>
+                <dd className="col-sm-8">{data.typeKey}</dd>
 
-              <hr className="my-3" />
+                <dt className="col-sm-4 text-muted">Danh mục</dt>
+                <dd className="col-sm-8">
+                  <span className="badge bg-secondary">{data.category}</span>
+                </dd>
 
-              <h6 className="fw-bold mb-2">Mô tả</h6>
-              <p className="mb-0 text-break" style={{ whiteSpace: 'pre-wrap' }}>
-                {data.description || <span className="text-muted fst-italic">Không có mô tả</span>}
-              </p>
+                <dt className="col-sm-4 text-muted">Ưu tiên</dt>
+                <dd className="col-sm-8">
+                  <span className="badge bg-primary">{data.priority}</span>
+                </dd>
+
+                <dt className="col-sm-4 text-muted">Ngày tạo</dt>
+                <dd className="col-sm-8">{formatDate(data.createdAt)}</dd>
+
+                <dt className="col-sm-4 text-muted">Mô tả</dt>
+                <dd className="col-sm-8">{data.description || "—"}</dd>
+              </dl>
             </div>
           </div>
 
           <div className="card shadow-sm">
-            <div className="card-header bg-light fw-bold">Dữ liệu chi tiết</div>
+            <div className="card-header">Dữ liệu chi tiết</div>
             <div className="card-body">
-              {renderCustom()}
+              {Object.keys(data.custom || {}).length === 0 ? (
+                <span className="text-muted fst-italic">
+                  Không có dữ liệu bổ sung
+                </span>
+              ) : (
+                <dl>
+                  {Object.entries(data.custom).map(([k, v]) => (
+                    <React.Fragment key={k}>
+                      <dt className="text-muted">{k}</dt>
+                      <dd>{String(v)}</dd>
+                    </React.Fragment>
+                  ))}
+                </dl>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Right Column: Approval Workflow */}
+        {/* RIGHT – APPROVAL TIMELINE */}
         <div className="col-md-4">
-          <div className="card shadow-sm mb-4">
-            <div className="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
-              <span>Quy trình duyệt</span>
-              <span
-                className={
-                  'badge ' +
-                  (approvalStatus === 'APPROVED'
-                    ? 'bg-success'
-                    : approvalStatus === 'REJECTED'
-                    ? 'bg-danger'
-                    : 'bg-warning text-dark')
-                }
-              >
-                {approvalStatus}
-              </span>
-            </div>
-            <ul className="list-group list-group-flush">
-              {approvals.length === 0 ? (
-                <li className="list-group-item text-muted fst-italic">Không yêu cầu duyệt.</li>
-              ) : (
-                approvals.map((a: any, idx: number) => {
-                  const isCurrentStep = !a.decision && a.level === nextLevel && approvalStatus !== 'REJECTED';
+          <div className="card shadow-sm">
+            <div className="card-header">Quy trình duyệt</div>
+            <div className="card-body">
+              <div className="timeline">
+                {approvals.length === 0 && (
+                  <p className="text-muted fst-italic">Không yêu cầu duyệt</p>
+                )}
+
+                {approvals.map((a: any) => {
+                  const state =
+                    a.decision === "APPROVED"
+                      ? "approved"
+                      : a.decision === "REJECTED"
+                      ? "rejected"
+                      : a.level === nextLevel
+                      ? "current"
+                      : "";
+
                   return (
-                    <li key={idx} className={`list-group-item ${isCurrentStep ? 'bg-primary-subtle' : ''}`}>
-                      <div className="d-flex justify-content-between align-items-center mb-1">
-                        <strong>Cấp {a.level}: {a.role}</strong>
-                        {a.decision ? (
-                          <span className={`badge ${a.decision === 'APPROVED' ? 'bg-success' : 'bg-danger'}`}>
-                            {a.decision}
-                          </span>
-                        ) : (
-                          <span className="badge bg-secondary">PENDING</span>
-                        )}
+                    <div className={`timeline-step ${state}`} key={a.level}>
+                      <div className="fw-bold">
+                        Cấp {a.level}: {a.role}
                       </div>
-                      {a.decision && (
+
+                      {a.decision ? (
                         <div className="small text-muted">
-                          Bởi: {(a.approver as any)?.name || a.approver} <br />
-                          Lúc: {formatDate(a.approvedAt)}
-                          {a.comment && <div className="mt-1 fst-italic">"{a.comment}"</div>}
+                          {a.decision} · {formatDate(a.approvedAt)}
                         </div>
+                      ) : a.level === nextLevel ? (
+                        <div className="small text-primary">Đang chờ duyệt</div>
+                      ) : (
+                        <div className="small text-muted">Chưa tới lượt</div>
                       )}
-                      {isCurrentStep && (
-                        <div className="small text-primary fw-bold">
-                          {canApprove ? '👉 Đang chờ bạn duyệt' : '⏳ Đang chờ duyệt'}
-                        </div>
-                      )}
-                    </li>
+                    </div>
                   );
-                })
-              )}
-            </ul>
+                })}
+              </div>
+            </div>
           </div>
 
+          {/* Approval Note */}
           {canApprove && (
-            <div className="card shadow-sm border-primary">
+            <div className="card border-primary mt-3">
               <div className="card-body">
-                <label className="form-label fw-bold">Ghi chú duyệt / từ chối</label>
+                <label className="form-label fw-bold">Ghi chú</label>
                 <textarea
-                  className="form-control"
                   rows={3}
-                  placeholder="Nhập lý do hoặc ghi chú..."
+                  className="form-control"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />

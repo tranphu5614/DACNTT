@@ -6,16 +6,55 @@ export default function RegisterPage() {
   const isAdmin = hasRole('ADMIN');
 
   return (
-    <div className="card shadow-sm">
-      <div className="card-body">
-        <h4 className="card-title mb-1">Tạo tài khoản</h4>
-        <p className="text-secondary">Self-registration hiện bị vô hiệu hoá</p>
-        <p>Vui lòng liên hệ quản trị viên để được tạo tài khoản.</p>
+    <div className="page" style={{ maxWidth: 480, margin: '0 auto' }}>
+      <div className="card shadow-sm p-4" style={{ borderRadius: 16 }}>
+        
+        <h3 className="fw-bold mb-2">Tạo tài khoản</h3>
+        <p className="text-muted mb-3">Tính năng đăng ký hiện đã bị tắt</p>
+
+        {/* Icon + message */}
+        <div
+          className="d-flex align-items-start gap-3 p-3 rounded"
+          style={{
+            background: "#fff7ed",
+            border: "1px solid #fed7aa",
+            borderRadius: 12,
+          }}
+        >
+          <div
+            className="d-flex align-items-center justify-content-center rounded-circle"
+            style={{
+              width: 40,
+              height: 40,
+              background: "#fdba74",
+              color: "#7c2d12",
+              fontWeight: 700,
+              fontSize: 20,
+            }}
+          >
+            !
+          </div>
+
+          <div>
+            <div className="fw-semibold" style={{ color: "#7c2d12" }}>
+              Self-registration bị vô hiệu hoá
+            </div>
+            <div className="text-muted small">
+              Vui lòng liên hệ quản trị viên để được cấp tài khoản truy cập hệ thống.
+            </div>
+          </div>
+        </div>
+
+        {/* Admin shortcut */}
         {token && isAdmin && (
-          <p className="mb-0">
-            Bạn là admin? <Link to="/admin/users/create">Tạo user tại đây</Link>.
-          </p>
+          <div className="mt-4 text-center">
+            <p className="text-muted mb-1">Bạn là admin?</p>
+            <Link to="/admin/users/create" className="btn btn-primary btn-sm px-3">
+              Tạo user mới
+            </Link>
+          </div>
         )}
+
       </div>
     </div>
   );

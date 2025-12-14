@@ -15,11 +15,10 @@ export default function MyRequestsPage() {
   const [rows, setRows] = useState<MyRequestItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit] = useState(20);
+  const limit = 20;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // --- FIX: Thêm state này để buộc reload khi cần ---
   const [refreshKey, setRefreshKey] = useState(0);
 
   const canLoad = useMemo(() => Boolean(token), [token]);
@@ -31,14 +30,17 @@ export default function MyRequestsPage() {
       if (!canLoad) return;
       setLoading(true);
       setError(null);
+
       try {
         const res = await apiMyRequests(token!, { page, limit });
         if (aborted) return;
+
         setRows(res.items);
         setTotal(res.total);
       } catch (e: any) {
         if (aborted) return;
         console.error(e);
+
         setRows([]);
         setTotal(0);
         setError(e?.message ?? 'Đã có lỗi xảy ra khi tải dữ liệu');
@@ -51,18 +53,16 @@ export default function MyRequestsPage() {
     return () => {
       aborted = true;
     };
-    // Thêm refreshKey vào dependency array để kích hoạt lại useEffect khi nó thay đổi
   }, [canLoad, token, page, limit, refreshKey]);
 
-  // --- FIX: Hàm xử lý nút Tải lại ---
   const handleReload = () => {
-    setPage(1); // Đưa về trang đầu
-    setRefreshKey((prev) => prev + 1); // Thay đổi key để buộc useEffect chạy lại
+    setPage(1);
+    setRefreshKey((k) => k + 1);
   };
 
   if (!token) {
     return (
-      <div className="container py-4">
+      <div className="page">
         <h3>Yêu cầu của tôi</h3>
         <div className="alert alert-warning mt-3">
           Vui lòng đăng nhập để xem yêu cầu của bạn.
@@ -72,32 +72,47 @@ export default function MyRequestsPage() {
   }
 
   return (
-    <div className="container py-4">
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h3 className="m-0">Yêu cầu của tôi</h3>
+    <div className="page">
+
+      {/* HEADER */}
+      <div className="d-flex align-items-center justify-content-between mb-4">
         <div>
-          <span className="me-2">Tổng: <strong>{total}</strong></span>
+          <h3 className="fw-bold mb-1">Yêu cầu của tôi</h3>
+          <p className="text-muted small m-0">
+            Danh sách yêu cầu bạn đã gửi vào hệ thống
+          </p>
+        </div>
+
+        {/* Tổng + Reload */}
+        <div className="d-flex align-items-center gap-2">
+          <span className="text-muted">
+            Tổng: <strong>{total}</strong>
+          </span>
+
           <button
-            className="btn btn-outline-secondary btn-sm"
+            className="btn btn-outline-primary btn-sm d-flex align-items-center gap-1"
             disabled={loading}
-            onClick={handleReload} // 👈 Sử dụng hàm handleReload mới
-            title="Tải lại dữ liệu mới nhất từ server"
+            onClick={handleReload}
           >
-            {loading ? 'Đang tải...' : '↻ Tải lại'}
+            <i className="bi bi-arrow-clockwise"></i>
+            {loading ? 'Đang tải...' : 'Tải lại'}
           </button>
         </div>
       </div>
 
+      {/* ERROR */}
       {error && <div className="alert alert-danger">{error}</div>}
 
+      {/* NO DATA */}
       {!loading && rows.length === 0 && !error && (
         <div className="alert alert-info">
           Chưa có yêu cầu nào. Hãy tạo yêu cầu mới.
         </div>
       )}
 
-      <div className="table-responsive">
-        <table className="table table-sm table-hover align-middle">
+      {/* TABLE */}
+      <div className="table-responsive shadow-sm rounded">
+        <table className="table table-hover align-middle">
           <thead className="table-light">
             <tr>
               <th>Tiêu đề</th>
@@ -109,33 +124,69 @@ export default function MyRequestsPage() {
               <th>Cập nhật</th>
             </tr>
           </thead>
+
           <tbody>
             {rows.map((r) => (
               <tr key={r._id}>
+                
+                {/* Tiêu đề */}
                 <td>
-                  <a href={`/requests/${r._id}`} className="text-decoration-none fw-semibold">
+                  <a
+                    href={`/requests/${r._id}`}
+                    className="fw-semibold text-decoration-none"
+                  >
                     {r.title || '(Không tiêu đề)'}
                   </a>
                 </td>
+
                 <td>{r.category}</td>
+
+                {/* Priority */}
                 <td>
-                  {r.priority ? <span className={`badge ${r.priority === 'URGENT' ? 'text-bg-danger' : r.priority === 'HIGH' ? 'text-bg-warning' : 'text-bg-info'}`}>{r.priority}</span> : '-'}
+                  {r.priority ? (
+                    <span
+                      className={
+                        'badge px-2 py-1 ' +
+                        (r.priority === 'URGENT'
+                          ? 'text-bg-danger'
+                          : r.priority === 'HIGH'
+                          ? 'text-bg-warning'
+                          : 'text-bg-info')
+                      }
+                      style={{ borderRadius: 10 }}
+                    >
+                      {r.priority}
+                    </span>
+                  ) : (
+                    '-'
+                  )}
                 </td>
-                <td><span className="badge text-bg-secondary">{r.status}</span></td>
+
+                {/* Status */}
+                <td>
+                  <span className="badge text-bg-secondary px-2 py-1" style={{ borderRadius: 10 }}>
+                    {r.status}
+                  </span>
+                </td>
+
+                {/* Approval */}
                 <td>
                   <span
                     className={
-                      'badge ' +
+                      'badge px-2 py-1 ' +
                       (r.approvalStatus === 'APPROVED'
                         ? 'text-bg-success'
                         : r.approvalStatus === 'REJECTED'
                         ? 'text-bg-danger'
                         : 'text-bg-light text-dark border')
                     }
+                    style={{ borderRadius: 10 }}
                   >
                     {r.approvalStatus ?? 'NONE'}
                   </span>
                 </td>
+
+                {/* Dates */}
                 <td className="small text-muted">{formatDate(r.createdAt)}</td>
                 <td className="small text-muted">{formatDate(r.updatedAt)}</td>
               </tr>
@@ -144,20 +195,23 @@ export default function MyRequestsPage() {
         </table>
       </div>
 
+      {/* PAGINATION */}
       {total > limit && (
-        <div className="d-flex gap-2 mt-3 justify-content-end">
+        <div className="d-flex gap-2 mt-3 justify-content-end align-items-center">
           <button
             className="btn btn-outline-primary btn-sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             « Trước
           </button>
-          <span className="align-self-center px-2">Trang {page}</span>
+
+          <span className="text-muted small">Trang {page}</span>
+
           <button
             className="btn btn-outline-primary btn-sm"
-            onClick={() => setPage((p) => p + 1)}
             disabled={page * limit >= total || loading}
+            onClick={() => setPage((p) => p + 1)}
           >
             Sau »
           </button>

@@ -13,56 +13,97 @@ export default function LoginPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErr('');
+
     try {
       await login(email, password);
       const to = loc?.state?.from?.pathname || '/profile';
       nav(to, { replace: true });
     } catch (e: any) {
-      setErr(e?.message || 'Login failed');
+      setErr(e?.message || 'Đăng nhập thất bại');
     }
   };
 
   return (
-    <div className="card shadow-sm">
-      <div className="card-body">
-        <h4 className="card-title mb-1">Welcome back</h4>
-        <p className="text-secondary">Đăng nhập để tiếp tục</p>
+    <div
+      className="d-flex align-items-center justify-content-center"
+      style={{ minHeight: '85vh' }}
+    >
+      <div
+        className="card shadow p-4"
+        style={{
+          width: '100%',
+          maxWidth: 420,
+          borderRadius: 20
+        }}
+      >
+        <div className="card-body">
 
-        {err && <div className="alert alert-danger">{err}</div>}
+          {/* TITLE */}
+          <h3 className="fw-bold text-center mb-1">Đăng nhập</h3>
+          <p className="text-center text-secondary mb-4">
+            Chào mừng bạn quay lại hệ thống
+          </p>
 
-        <form onSubmit={onSubmit} className="row g-3">
-          <div className="col-12">
-            <label className="form-label">Email</label>
-            <input
-              className="form-control"
-              type="email"
-              placeholder="you@company.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-              required
-            />
-          </div>
+          {/* ERROR */}
+          {err && <div className="alert alert-danger py-2">{err}</div>}
 
-          <div className="col-12">
-            <label className="form-label">Password</label>
-            <input
-              className="form-control"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
-              required
-            />
-          </div>
+          <form onSubmit={onSubmit} className="row g-3">
 
-          <div className="col-12 d-grid">
-            <button className="btn btn-primary" type="submit" disabled={loading}>
-              {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
-            </button>
-          </div>
-        </form>
+            {/* EMAIL */}
+            <div className="col-12">
+              <label className="form-label fw-semibold">Email</label>
+
+              <div className="input-group">
+                <span className="input-group-text bg-light">
+                  <i className="bi bi-envelope-fill text-secondary"></i>
+                </span>
+
+                <input
+                  type="email"
+                  className="form-control"
+                  placeholder="admin@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* PASSWORD */}
+            <div className="col-12">
+              <label className="form-label fw-semibold">Mật khẩu</label>
+
+              <div className="input-group">
+                <span className="input-group-text bg-light">
+                  <i className="bi bi-lock-fill text-secondary"></i>
+                </span>
+
+                <input
+                  type="password"
+                  className="form-control"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={6}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* SUBMIT BUTTON */}
+            <div className="col-12 d-grid">
+              <button
+                className="btn btn-primary btn-lg fw-semibold"
+                style={{ borderRadius: 12 }}
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+              </button>
+            </div>
+
+          </form>
+        </div>
       </div>
     </div>
   );

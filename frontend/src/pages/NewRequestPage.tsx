@@ -1,4 +1,3 @@
-// frontend/src/pages/NewRequestPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request as apiRequest } from '../api/request';
@@ -35,23 +34,16 @@ type CatalogItem = {
   fields: CatalogField[];
 };
 
-type Room = { key: string; name: string; size: 'SMALL' | 'LARGE' };
-
 export default function NewRequestPage() {
   const navigate = useNavigate();
-  const [token, setToken] = useState<string>('');
+
+  const [token, setToken] = useState('');
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [form, setForm] = useState<{
-    category: 'HR' | 'IT';
-    typeKey: string;
-    title: string;
-    // Đã bỏ description và priority khỏi state form UI
-    custom: Record<string, any>;
-  }>({
-    category: 'HR',
+  const [form, setForm] = useState({
+    category: 'HR' as 'HR' | 'IT',
     typeKey: '',
     title: '',
-    custom: {},
+    custom: {} as Record<string, any>,
   });
 
   const [remoteOptions, setRemoteOptions] = useState<Record<string, SelectOption[]>>({});
@@ -60,7 +52,6 @@ export default function NewRequestPage() {
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [aiSuggestions, setAiSuggestions] = useState<KnowledgeSuggestion[]>([]);
-
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -71,8 +62,8 @@ export default function NewRequestPage() {
     return tpl.replace(/\{([^}]+)\}/g, (_m, expr: string) => {
       try {
         if (expr.startsWith('custom.')) {
-          const k = expr.slice('custom.'.length);
-          return encodeURIComponent(form.custom?.[k] ?? '');
+          const key = expr.replace('custom.', '');
+          return encodeURIComponent(form.custom[key] ?? '');
         }
         return encodeURIComponent((form as any)[expr] ?? '');
       } catch {
@@ -85,44 +76,46 @@ export default function NewRequestPage() {
     return v ? new Date(v).toISOString() : '';
   }
 
-  const current = useMemo(
-    () => catalog.find((c) => c.typeKey === form.typeKey),
-    [catalog, form.typeKey],
-  );
-
-  // AI Suggestion chỉ dựa trên Title
+  const current = useMemo(() => {
+    return catalog.find((c) => c.typeKey === form.typeKey) || null;
+  }, [catalog, form.typeKey]);
+  // AI Suggestion
   useEffect(() => {
-    if (!token || form.category !== 'IT' || !form.title || form.title.trim().length < 3) {
+    if (!token || form.category !== 'IT' || !form.title.trim() || form.title.length < 3) {
       setAiSuggestions([]);
       return;
     }
+
     const timer = setTimeout(async () => {
       try {
         const res = await apiSuggestKnowledge(token, form.title);
         setAiSuggestions(res.filter((s) => s.score > 0.3).slice(0, 3));
-      } catch (e) { /* ignore */ }
+      } catch {}
     }, 500);
+
     return () => clearTimeout(timer);
   }, [token, form.category, form.title]);
 
-  // Load catalog
+  // LOAD catalog (FIX find + undefined)
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
 
     (async () => {
       try {
-        const data = await apiRequest<CatalogItem[]>(
-          `/catalog?category=${form.category}`,
-          { method: 'GET' },
-          token,
-        );
+        const data = (await apiRequest(`/catalog?category=${form.category}`, { method: 'GET' }, token)) as
+          | CatalogItem[]
+          | undefined;
+
         if (cancelled) return;
 
-        setCatalog(data || []);
+        const list = data ?? [];
+        setCatalog(list); // FIX setCatalog
 
-        if (!data?.find((x) => x.typeKey === form.typeKey)) {
-          const first = data?.[0];
+        const exists = list.find((x) => x.typeKey === form.typeKey);
+
+        if (!exists) {
+          const first = list[0];
           setForm((old) => ({
             ...old,
             typeKey: first?.typeKey ?? '',
@@ -133,7 +126,7 @@ export default function NewRequestPage() {
         }
       } catch (e: any) {
         setCatalog([]);
-        setMsg({ type: 'error', text: e?.message || 'Không tải được catalog' });
+        setMsg({ type: 'error', text: e?.message ?? 'Không tải được catalog' });
       }
     })();
 
@@ -142,7 +135,7 @@ export default function NewRequestPage() {
     };
   }, [token, form.category]);
 
-  // Load dynamic fields
+  // Dynamic Select Loader (FIX map)
   useEffect(() => {
     if (!token || !current) return;
     let cancelled = false;
@@ -153,63 +146,52 @@ export default function NewRequestPage() {
       const url = buildUrlFromTemplate((f as DynamicSelectField).optionsUrlTemplate);
 
       if (/\{[^}]+\}/.test(url)) {
-        setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
+        setRemoteOptions((p) => ({ ...p, [f.key]: [] }));
         return;
       }
 
       try {
-        setLoadingRemote((prev) => ({ ...prev, [f.key]: true }));
-        const data = await apiRequest<Array<Room | { key?: string; name?: string; value?: string; label?: string }>>(
-          url,
-          { method: 'GET' },
-          token,
-        );
+        setLoadingRemote((p) => ({ ...p, [f.key]: true }));
+        const raw = (await apiRequest(url, { method: 'GET' }, token)) as any[] | undefined;
+
         if (cancelled) return;
 
-        const mapped: SelectOption[] = (data || []).map((d: any) => ({
+        const mapped = (raw ?? []).map((d: any) => ({
           value: String(d.value ?? d.key ?? ''),
           label: String(d.label ?? d.name ?? d.value ?? d.key ?? ''),
         }));
 
-        setRemoteOptions((prev) => ({ ...prev, [f.key]: mapped }));
+        setRemoteOptions((p) => ({ ...p, [f.key]: mapped }));
 
-        if (form.custom?.[f.key] && !mapped.find((m) => m.value === form.custom[f.key])) {
-          setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: '' } }));
-        }
-      } catch (err) {
-        setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
+      } catch {
+        setRemoteOptions((p) => ({ ...p, [f.key]: [] }));
       } finally {
-        setLoadingRemote((prev) => ({ ...prev, [f.key]: false }));
+        setLoadingRemote((p) => ({ ...p, [f.key]: false }));
       }
     };
 
     (async () => {
-      for (const f of current.fields) {
-        await fetchField(f);
-      }
+      for (const f of current.fields) await fetchField(f);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [token, current, form.typeKey, form.custom?.start, form.custom?.end, form.custom?.size]);
+  }, [token, current, form.custom?.start, form.custom?.end, form.custom?.size]);
 
-  // --- SUBMIT FORM ---
+  // SUBMIT
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
 
-    if (!token) {
-      setMsg({ type: 'error', text: 'Bạn chưa đăng nhập.' });
-      return;
-    }
+    if (!token) return setMsg({ type: 'error', text: 'Bạn chưa đăng nhập.' });
 
     setLoading(true);
 
     try {
-      const normalizedCustom = { ...form.custom };
-      if (normalizedCustom.start) normalizedCustom.start = toISO(normalizedCustom.start);
-      if (normalizedCustom.end) normalizedCustom.end = toISO(normalizedCustom.end);
+      const custom = { ...form.custom };
+      if (custom.start) custom.start = toISO(custom.start);
+      if (custom.end) custom.end = toISO(custom.end);
 
       const files = fileInputRef.current?.files ? Array.from(fileInputRef.current.files) : [];
 
@@ -217,211 +199,176 @@ export default function NewRequestPage() {
         category: form.category,
         typeKey: form.typeKey,
         title: form.title || current?.title || '',
-        description: '', // Luôn gửi rỗng
-        priority: '',    // Luôn gửi rỗng để BE tự chạy AI
-        custom: normalizedCustom,
+        description: '',
+        priority: '',
+        custom,
         files,
       });
 
-      alert('✅ Tạo yêu cầu thành công! Đang chuyển về danh sách...');
+      alert('✅ Tạo yêu cầu thành công!');
       navigate('/requests/mine');
 
-    } catch (err: any) {
-      const text = err?.message || 'Không thể tạo yêu cầu. Vui lòng thử lại.';
-      setMsg({ type: 'error', text });
+    } catch (e: any) {
+      setMsg({ type: 'error', text: e?.message || 'Không thể tạo yêu cầu.' });
       setLoading(false);
     }
   };
-
   return (
-    <div className="container py-3">
-      <h3 className="mb-3">Tạo yêu cầu</h3>
+    <div className="page" style={{ maxWidth: 760, margin: '0 auto' }}>
+      <h2 className="fw-bold mb-1">Tạo yêu cầu mới</h2>
+      <p className="text-muted small mb-3">Hãy điền đầy đủ thông tin</p>
 
       {msg && (
-        <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`} role="alert">
+        <div className={`alert ${msg.type === 'success' ? 'alert-success' : 'alert-danger'}`}>
           {msg.text}
         </div>
       )}
 
-      <div className="row mb-3">
-        <div className="col-md-6">
-          <label className="form-label">Danh mục</label>
-          <select
-            className="form-select"
-            value={form.category}
-            onChange={(e) =>
-              setForm((old) => ({
-                ...old,
-                category: e.target.value as 'HR' | 'IT',
-                typeKey: '',
-                title: '',
-                custom: {},
-              }))
-            }
-          >
-            <option value="HR">HR</option>
-            <option value="IT">IT</option>
-          </select>
+      <div className="card p-4 shadow-sm" style={{ borderRadius: 16 }}>
+        <div className="row">
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">Danh mục</label>
+            <select
+              className="form-select"
+              value={form.category}
+              onChange={(e) =>
+                setForm({
+                  category: e.target.value as 'HR' | 'IT',
+                  typeKey: '',
+                  title: '',
+                  custom: {},
+                })
+              }
+            >
+              <option value="HR">HR</option>
+              <option value="IT">IT</option>
+            </select>
+          </div>
+
+          <div className="col-md-6 mb-3">
+            <label className="form-label fw-semibold">Loại yêu cầu</label>
+            <select
+              className="form-select"
+              value={form.typeKey}
+              onChange={(e) => {
+                const tk = e.target.value;
+                const found = catalog.find((c) => c.typeKey === tk);
+                setForm({
+                  ...form,
+                  typeKey: tk,
+                  title: found?.title ?? '',
+                  custom: {},
+                });
+              }}
+            >
+              <option value="">-- Chọn --</option>
+              {catalog.map((c) => (
+                <option key={c.typeKey} value={c.typeKey}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="col-md-6">
-          <label className="form-label">Loại yêu cầu</label>
-          <select
-            className="form-select"
-            value={form.typeKey}
-            onChange={(e) => {
-              const tk = e.target.value;
-              const found = catalog.find((c) => c.typeKey === tk);
-              setForm((old) => ({
-                ...old,
-                typeKey: tk,
-                title: found?.title ?? '',
-                custom: {},
-              }));
-              setRemoteOptions({});
-            }}
-          >
-            <option value="">-- Chọn --</option>
-            {catalog.map((c) => (
-              <option key={c.typeKey} value={c.typeKey}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+        {current && (
+          <form onSubmit={onSubmit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold">
+                Tiêu đề <span className="text-danger">*</span>
+              </label>
+              <input
+                className="form-control"
+                required
+                placeholder={current.title}
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+              />
+              <div className="form-text">Hệ thống sẽ tự động phân tích mức độ ưu tiên.</div>
 
-      {current && (
-        <form onSubmit={onSubmit}>
-          <div className="mb-3">
-            <label className="form-label">Tiêu đề <span className="text-danger">*</span></label>
-            <input
-              className="form-control"
-              required
-              value={form.title}
-              onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
-              placeholder={current.title}
-            />
-            <div className="form-text">
-              Hệ thống sẽ tự động phân tích mức độ ưu tiên dựa trên tiêu đề bạn nhập.
+              {aiSuggestions.length > 0 && (
+                <div className="alert alert-info mt-2 py-2">
+                  <strong>💡 Gợi ý từ AI:</strong>
+                  <ul className="mb-0 ps-3">
+                    {aiSuggestions.map((s) => (
+                      <li key={s.id}>
+                        <strong>{s.title}:</strong> {s.suggestion}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
-            {aiSuggestions.length > 0 && (
-              <div className="alert alert-info mt-2 mb-0 p-2" style={{ fontSize: '0.9rem' }}>
-                <strong>💡 Gợi ý từ AI:</strong>
-                <ul className="mb-0 ps-3">
-                  {aiSuggestions.map((s) => (
-                    <li key={s.id}>
-                      <strong>{s.title}:</strong> {s.suggestion}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+            {current.fields.map((f) => {
+              if (f.type === 'select') {
+                const options = remoteOptions[f.key] || [];
+                const isLoading = loadingRemote[f.key];
 
-          {current.fields.map((f) => {
-            if (f.type === 'select') {
-              const dynTpl = (f as DynamicSelectField).optionsUrlTemplate;
-              const isDynamic = typeof dynTpl === 'string' && dynTpl.length > 0;
-              const options: SelectOption[] = isDynamic
-                ? remoteOptions[f.key] || []
-                : (f as StaticSelectField).options;
+                return (
+                  <div className="mb-3" key={f.key}>
+                    <label className="form-label fw-semibold">
+                      {f.label} {f.required && <span className="text-danger">*</span>}
+                    </label>
 
-              const isLoading = !!loadingRemote[f.key];
-
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <select
-                    className="form-select"
-                    required={!!f.required}
-                    value={form.custom?.[f.key] ?? ''}
-                    onChange={(e) =>
-                      setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } }))
-                    }
-                    disabled={isDynamic && (isLoading || options.length === 0)}
-                  >
-                    <option value="">
-                      {isDynamic ? (isLoading ? 'Đang tải...' : '-- Chọn --') : '-- Chọn --'}
-                    </option>
-                    {options.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
+                    <select
+                      className="form-select"
+                      required={f.required}
+                      disabled={isLoading || options.length === 0}
+                      value={form.custom[f.key] ?? ''}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          custom: { ...form.custom, [f.key]: e.target.value },
+                        })
+                      }
+                    >
+                      <option value="">
+                        {isLoading ? 'Đang tải...' : '-- Chọn --'}
                       </option>
-                    ))}
-                  </select>
-                  {isDynamic && !isLoading && options.length === 0 && (
-                    <div className="form-text text-danger">
-                      Không có lựa chọn phù hợp.
-                    </div>
-                  )}
-                </div>
-              );
-            }
+                      {options.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
 
-            const commonProps = {
-              className: 'form-control',
-              required: !!f.required,
-              value: form.custom?.[f.key] ?? '',
-              onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-                setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: e.target.value } })),
-            };
+              const common = {
+                className: 'form-control',
+                required: f.required,
+                value: form.custom[f.key] ?? '',
+                onChange: (e: any) =>
+                  setForm({
+                    ...form,
+                    custom: { ...form.custom, [f.key]: e.target.value },
+                  }),
+              };
 
-            if (f.type === 'datetime') {
               return (
                 <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="datetime-local" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'date') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="date" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'number') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="number" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'text') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <input type="text" {...commonProps} />
-                </div>
-              );
-            }
-            if (f.type === 'textarea') {
-              return (
-                <div className="mb-3" key={f.key}>
-                  <label className="form-label">{f.label} {f.required && <span className="text-danger">*</span>}</label>
-                  <textarea rows={3} {...commonProps} />
-                </div>
-              );
-            }
+                  <label className="form-label fw-semibold">
+                    {f.label} {f.required && <span className="text-danger">*</span>}
+                  </label>
 
-            return null;
-          })}
+                  {f.type === 'textarea' ? <textarea rows={3} {...common} /> : <input type={f.type} {...common} />}
+                </div>
+              );
+            })}
 
-          <div className="mb-3">
-            <label className="form-label">Tệp đính kèm</label>
-            <input ref={fileInputRef} type="file" multiple className="form-control" />
-          </div>
+            <div className="mb-4">
+              <label className="form-label fw-semibold">Tệp đính kèm</label>
+              <input ref={fileInputRef} type="file" multiple className="form-control" />
+            </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading || !token}>
-            {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
-          </button>
-        </form>
-      )}
+            <button className="btn btn-primary btn-lg w-100" disabled={loading}>
+              {loading ? 'Đang gửi...' : '🚀 Gửi yêu cầu'}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

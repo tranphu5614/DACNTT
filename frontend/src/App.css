@@ -1,42 +1,163 @@
+/* ===========================
+   THEME COLORS
+=========================== */
+:root {
+  --primary: #1A73E8;
+  --primary-hover: #1666ce;
+
+  --bg-light: #F7F9FC;
+  --bg-white: #ffffff;
+
+  --text-main: #222;
+  --text-muted: #6c757d;
+
+  --border: #E1E5EB;
+
+  --success: #0F9D58;
+  --danger: #D93025;
+  --warning: #F9A825;
+}
+
+/* ===========================
+   GLOBAL RESET
+=========================== */
+body {
+  background: var(--bg-light);
+  color: var(--text-main);
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
+/* ===========================
+   CARD
+=========================== */
 .card {
-  padding: 2em;
+  border-radius: 16px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--bg-white);
 }
 
+/* ===========================
+   INPUTS
+=========================== */
+.form-control {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 0.55rem 0.75rem;
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+}
+
+/* ===========================
+   BUTTONS
+=========================== */
+.btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-radius: 10px !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+.btn-outline-primary {
+  border-radius: 10px !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.btn-outline-primary:hover {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+/* ===========================
+   BADGES (Roles, Status)
+=========================== */
+.badge {
+  border-radius: 8px !important;
+  font-size: 0.75rem;
+  padding: 5px 10px;
+}
+
+/* ===========================
+   NAVBAR
+=========================== */
+.navbar {
+  background: white !important;
+  border-bottom: 1px solid var(--border);
+}
+
+.navbar-brand {
+  font-weight: 600;
+}
+
+/* ===========================
+   SIDEBAR
+=========================== */
+.sidebar {
+  background: white;
+  border-right: 1px solid var(--border);
+  height: 100vh;
+  padding-top: 1rem;
+}
+
+.sidebar a {
+  color: var(--text-main);
+  display: block;
+  padding: 10px 18px;
+  border-radius: 10px;
+  text-decoration: none;
+  margin-bottom: 4px;
+}
+
+.sidebar a:hover {
+  background: var(--primary);
+  color: white !important;
+}
+
+.sidebar a.active {
+  background: var(--primary);
+  color: white !important;
+}
+
+/* ===========================
+   TABLES
+=========================== */
+.table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.table-hover tbody tr:hover {
+  background: #eef4ff;
+}
+
+.table thead {
+  background: #f3f6fb;
+}
+
+/* ===========================
+   PAGINATION
+=========================== */
+.page-link {
+  border-radius: 8px !important;
+}
+
+/* ===========================
+   REMOVE OLD VITE CSS
+=========================== */
+.logo,
+.logo.react,
 .read-the-docs {
-  color: #888;
+  display: none !important;
 }

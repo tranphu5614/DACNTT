@@ -25,14 +25,16 @@ export default function AdminUsersListPage() {
       setItems(res.items);
       setTotal(res.total);
     } catch (e: any) {
-      console.error(e);
       alert(e?.message || 'Load users failed');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-line */ }, [page, limit]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line
+  }, [page, limit]);
 
   const onSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,18 +44,20 @@ export default function AdminUsersListPage() {
 
   const onDelete = async (id: string, email: string) => {
     if (!token) return;
-    if (!confirm(`Xoá user "${email}"?`)) return;
+    if (!confirm(`Bạn có chắc muốn xoá "${email}"?`)) return;
+
     setDeletingId(id);
     try {
       await apiDeleteUser(token, id);
+
       if (me?._id === id) {
-        alert('Bạn vừa xoá chính mình – hệ thống sẽ đăng xuất.');
+        alert('Bạn vừa xoá tài khoản của chính mình — hệ thống sẽ đăng xuất.');
         location.href = '/login';
         return;
       }
+
       await load();
     } catch (e: any) {
-      console.error(e);
       alert(e?.message || 'Delete failed');
     } finally {
       setDeletingId(null);
@@ -62,74 +66,94 @@ export default function AdminUsersListPage() {
 
   return (
     <>
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h4 className="mb-0">Users</h4>
-        <Link to="/admin/users/create" className="btn btn-primary">+ Create user</Link>
+      {/* TITLE + CREATE BUTTON */}
+      <div className="d-flex align-items-center justify-content-between mb-4">
+        <h3 className="fw-bold mb-0">Quản lý người dùng</h3>
+        <Link to="/admin/users/create" className="btn btn-primary shadow-sm px-3">
+          <i className="bi bi-person-plus me-1"></i> Tạo user
+        </Link>
       </div>
 
-      <form className="row g-2 align-items-end mb-3" onSubmit={onSearch}>
+      {/* FILTER PANEL */}
+      <form className="row g-3 mb-4 bg-light p-3 rounded border" onSubmit={onSearch}>
+
         <div className="col-sm-5 col-12">
-          <label className="form-label">Search</label>
+          <label className="form-label fw-semibold">Tìm kiếm</label>
           <input
             className="form-control"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên/email…"
+            placeholder="Tên, email..."
           />
         </div>
+
         <div className="col-sm-3 col-6">
-          <label className="form-label">Role</label>
+          <label className="form-label fw-semibold">Vai trò</label>
           <select className="form-select" value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="">All roles</option>
+            <option value="">Tất cả</option>
             <option value="USER">USER</option>
             <option value="ADMIN">ADMIN</option>
             <option value="IT_MANAGER">IT_MANAGER</option>
             <option value="HR_MANAGER">HR_MANAGER</option>
           </select>
         </div>
+
         <div className="col-sm-2 col-6">
-          <label className="form-label">Limit</label>
-          <select className="form-select" value={limit} onChange={(e) => setLimit(parseInt(e.target.value, 10))}>
-            {[10, 20, 50].map((n) => <option key={n} value={n}>{n}/page</option>)}
+          <label className="form-label fw-semibold">Limit</label>
+          <select className="form-select" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
+            {[10, 20, 50].map((v) => <option key={v} value={v}>{v}/page</option>)}
           </select>
         </div>
+
         <div className="col-sm-2 col-12 d-grid">
-          <button className="btn btn-outline-primary" type="submit" disabled={loading}>Search</button>
+          <button className="btn btn-outline-primary" type="submit" disabled={loading}>
+            <i className="bi bi-search"></i> Tìm
+          </button>
         </div>
       </form>
 
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
+      {/* USERS TABLE */}
+      <div className="table-responsive shadow-sm rounded">
+        <table className="table table-hover align-middle mb-0">
           <thead className="table-light">
             <tr>
               <th>Email</th>
-              <th>Name</th>
-              <th>Roles</th>
-              <th>Created</th>
-              <th style={{ width: 160 }}>Actions</th>
+              <th>Tên</th>
+              <th>Vai trò</th>
+              <th>Ngày tạo</th>
+              <th className="text-center" style={{ width: 120 }}>Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {items.length === 0 && !loading && (
-              <tr><td colSpan={5} className="text-center">No data</td></tr>
+              <tr><td colSpan={5} className="text-center py-4">Không có dữ liệu</td></tr>
             )}
+
             {items.map((u) => (
               <tr key={u._id}>
                 <td>{u.email}</td>
                 <td>{u.name}</td>
                 <td className="text-nowrap">
                   {(u.roles || []).map((r) => (
-                    <span key={r} className="badge text-bg-info me-1">{r}</span>
+                    <span key={r} className="badge text-bg-info me-1 px-2 py-1">
+                      {r}
+                    </span>
                   ))}
                 </td>
-                <td>{(u as any).createdAt ? new Date((u as any).createdAt).toLocaleString() : '—'}</td>
                 <td>
+                  {u.createdAt ? new Date(u.createdAt as any).toLocaleDateString() : '—'}
+                </td>
+
+                <td className="text-center">
                   <button
                     className="btn btn-sm btn-outline-danger"
                     onClick={() => onDelete(u._id, u.email)}
-                    disabled={deletingId === u._id || loading}
+                    disabled={deletingId === u._id}
                   >
-                    {deletingId === u._id ? 'Đang xoá…' : 'Xoá'}
+                    {deletingId === u._id
+                      ? 'Đang xoá…'
+                      : <i className="bi bi-trash"></i>}
                   </button>
                 </td>
               </tr>
@@ -138,17 +162,25 @@ export default function AdminUsersListPage() {
         </table>
       </div>
 
-      {/* Pagination */}
-      <nav aria-label="pagination">
-        <ul className="pagination">
+      {/* PAGINATION */}
+      <nav className="mt-3">
+        <ul className="pagination justify-content-center">
           <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => setPage((p) => Math.max(1, p - 1))}>‹ Prev</button>
+            <button className="page-link" onClick={() => setPage(page - 1)}>
+              ‹ Prev
+            </button>
           </li>
+
           <li className="page-item disabled">
-            <span className="page-link">Page {page}/{totalPages} — {total} users</span>
+            <span className="page-link">
+              Trang {page}/{totalPages} — {total} users
+            </span>
           </li>
+
           <li className={`page-item ${page >= totalPages ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => setPage((p) => p + 1)}>Next ›</button>
+            <button className="page-link" onClick={() => setPage(page + 1)}>
+              Next ›
+            </button>
           </li>
         </ul>
       </nav>

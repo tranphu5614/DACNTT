@@ -1,0 +1,24 @@
+:root {
+  --primary: #1A73E8;
+  --primary-hover: #1666ce;
+  --bg-light: #F7F9FC;
+  --text-muted: #6c757d;
+  --border: #E1E5EB;
+  --success: #0F9D58;
+  --danger: #D93025;
+}
+
+/* Apply to Bootstrap overrides */
+.btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-hover) !important;
+  border-color: var(--primary-hover) !important;
+}
+
+body {
+  background: var(--bg-light);
+}

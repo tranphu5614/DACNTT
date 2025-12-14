@@ -9,5 +9,8 @@
     "install:all": "npm i --prefix backend && npm i --prefix frontend",
     "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "clean:deps": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"Remove-Item -Recurse -Force backend/node_modules, frontend/node_modules; Remove-Item -Force backend/package-lock.json, frontend/package-lock.json -ErrorAction SilentlyContinue\""
+  },
+  "dependencies": {
+    "bootstrap-icons": "^1.13.1"
   }
 }
