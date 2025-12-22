@@ -14,7 +14,8 @@ import RequireRoles from './routes/RequireRoles';
 import RequestsQueuePage from './pages/RequestsQueuePage';
 import RequestsToApprove from './pages/RequestsToApprove';
 import RequestDetail from './pages/RequestDetail';
-import Chatbot from './components/Chatbot'; // Import Chatbot
+import Chatbot from './components/Chatbot';
+import Dashboard from './pages/Dashboard'; // <--- 1. IMPORT DASHBOARD
 
 export default function App() {
   const { token, user, logout } = useAuth();
@@ -61,6 +62,17 @@ export default function App() {
               <Route path="/requests/mine" element={<MyRequestsPage />} />
               <Route path="/requests/pending" element={<RequestsToApprove />} />
               <Route path="/requests/:id" element={<RequestDetail />} />
+              
+              {/* --- 2. THÊM ROUTE DASHBOARD --- */}
+              <Route 
+                path="/dashboard" 
+                element={
+                  <RequireRoles anyOf={['ADMIN', 'MANAGER', 'HR_MANAGER', 'IT_MANAGER']}>
+                    <Dashboard />
+                  </RequireRoles>
+                } 
+              />
+
               <Route path="/queue/hr" element={<RequireRoles anyOf={['ADMIN', 'HR_MANAGER']}><RequestsQueuePage category="HR" /></RequireRoles>} />
               <Route path="/queue/it" element={<RequireRoles anyOf={['ADMIN', 'IT_MANAGER']}><RequestsQueuePage category="IT" /></RequireRoles>} />
             </Route>
@@ -72,7 +84,7 @@ export default function App() {
         </div>
       </div>
       <Sidebar variant="offcanvas" />
-      <Chatbot /> {/* Hiển thị Chatbot */}
+      <Chatbot />
     </div>
   );
 }

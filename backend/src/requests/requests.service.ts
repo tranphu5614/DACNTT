@@ -4,9 +4,12 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule'; // <--- IMPORT CRON
+import * as ExcelJS from 'exceljs'; // <--- IMPORT EXCEL
 import { Request as RequestEntity, RequestDocument } from './schemas/request.schema';
 import { ROOMS, RoomSize } from './rooms.constants';
 import { DEFAULT_CATALOG } from '../catalog/catalog.data';
@@ -17,6 +20,8 @@ type BusyDoc = { bookingRoomKey?: string };
 
 @Injectable()
 export class RequestsService {
+  private readonly logger = new Logger(RequestsService.name);
+
   constructor(
     @InjectModel(RequestEntity.name)
     private readonly model: Model<RequestDocument>,
@@ -27,7 +32,7 @@ export class RequestsService {
     return DEFAULT_CATALOG.find((c) => c.typeKey === typeKey);
   }
 
-  // [UPDATED] Trả về danh sách phòng kèm trạng thái isBusy
+  // --- 1. LOGIC ĐẶT PHÒNG ---
   async getAvailableRooms(dateStr: string, fromStr: string, toStr: string, size: RoomSize) {
     if (!dateStr || !fromStr || !toStr) return [];
 
@@ -59,18 +64,17 @@ export class RequestsService {
       (busy || []).map((b: BusyDoc) => b.bookingRoomKey).filter(Boolean),
     );
 
-    // Thay vì filter, ta map để trả về full danh sách kèm trạng thái
     return ROOMS
       .filter((r) => r.size === size)
       .map((r) => ({
         ...r,
-        isBusy: busyKeys.has(r.key), // True nếu phòng đang bận
-        // Các trường hỗ trợ mapping FE
+        isBusy: busyKeys.has(r.key),
         value: r.key,
         label: r.name
       }));
   }
 
+  // --- 2. TẠO REQUEST ---
   async createWithRequester(
     requesterId: string,
     dto: any,
@@ -84,18 +88,13 @@ export class RequestsService {
       }
     }
 
-    // ... (Giữ nguyên logic AI Auto-Priority)
     if (!dto.priority) {
       const textParts = [dto.title, dto.description].filter(Boolean);
       const textToAnalyze = textParts.join('. ');
 
       if (textToAnalyze && textToAnalyze.trim().length >= 5) {
         const suggested = await this.priorityClassifier.suggestPriority(textToAnalyze);
-        if (suggested) {
-          dto.priority = suggested;
-        } else {
-          dto.priority = 'MEDIUM';
-        }
+        dto.priority = suggested || 'MEDIUM';
       } else {
         dto.priority = 'MEDIUM';
       }
@@ -110,7 +109,7 @@ export class RequestsService {
 
     const hasApproval = approvalsFromCatalog.length > 0;
 
-    if (dto?.category === 'HR' && dto?.typeKey === 'meeting_room_booking') {
+    if (dto?.typeKey === 'meeting_room_booking') {
       const c = dto.custom || {};
       const { size, bookingDate, fromTime, toTime, roomKey } = c;
 
@@ -149,6 +148,12 @@ export class RequestsService {
       mimetype: f.mimetype,
     }));
 
+    // Tính toán hạn xử lý (SLA) đơn giản: URGENT = 4h, HIGH = 24h, khác = 3 ngày
+    let dueDate = new Date();
+    if (dto.priority === 'URGENT') dueDate.setHours(dueDate.getHours() + 4);
+    else if (dto.priority === 'HIGH') dueDate.setHours(dueDate.getHours() + 24);
+    else dueDate.setDate(dueDate.getDate() + 3);
+
     const doc = await this.model.create({
       category: dto.category,
       typeKey: dto.typeKey,
@@ -165,12 +170,15 @@ export class RequestsService {
       approvals: approvalsFromCatalog,
       currentApprovalLevel: 0,
       approvalStatus: hasApproval ? 'PENDING' : 'NONE',
+      assignedTo: null,
+      dueDate: dueDate, // Lưu hạn xử lý
+      comments: []
     });
 
     return doc;
   }
 
-  // ... (Giữ nguyên các hàm còn lại: listMine, listQueue, getById, etc.)
+  // --- 3. CÁC CHỨC NĂNG LIST/GET ---
   async listMine(userId: string, page = 1, limit = 10) {
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
@@ -181,6 +189,7 @@ export class RequestsService {
       this.model
         .find({ requester: uid })
         .populate('requester', 'name email')
+        .populate('assignedTo', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l)
@@ -192,7 +201,7 @@ export class RequestsService {
   }
 
   async listQueue(
-    filter: { category: 'HR' | 'IT'; status?: string; priority?: string; q?: string },
+    filter: { category: string; status?: string; priority?: string; q?: string },
     page = 1,
     limit = 10,
   ) {
@@ -212,6 +221,7 @@ export class RequestsService {
       this.model
         .find(query)
         .populate('requester', 'name email')
+        .populate('assignedTo', 'name email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(l)
@@ -225,13 +235,16 @@ export class RequestsService {
   async getById(id: string) {
     const doc = await this.model
       .findById(id)
-      .populate('requester', 'name email')
+      .populate('requester', 'name email department')
+      .populate('assignedTo', 'name email')
       .populate('approvals.approver', 'name email')
+      .populate('comments.author', 'name email')
       .exec();
     if (!doc) throw new NotFoundException('Request not found');
     return doc;
   }
 
+  // --- 4. APPROVE/REJECT ---
   async listPendingForApprover(user: { _id: string; roles?: string[] }) {
     const roles = user.roles || [];
     if (!roles.length) return [];
@@ -334,9 +347,7 @@ export class RequestsService {
 
   async suggestDescriptions(query: string): Promise<string[]> {
     if (!query || query.trim().length < 2) return [];
-
     const q = query.trim().toLowerCase();
-
     return ERROR_SUGGESTIONS
       .map((s) => ({
         text: s,
@@ -348,5 +359,149 @@ export class RequestsService {
       .sort((a, b) => b.score - a.score)
       .slice(0, 6)
       .map((x) => x.text);
+  }
+
+  // --- 5. COMMENT & ASSIGN ---
+  async addComment(id: string, userId: string, content: string, isInternal: boolean) {
+    const request = await this.model.findByIdAndUpdate(
+      id,
+      {
+        $push: {
+          comments: {
+            content,
+            author: new Types.ObjectId(userId),
+            createdAt: new Date(),
+            isInternal
+          }
+        }
+      },
+      { new: true }
+    ).populate('comments.author', 'name email');
+
+    if (!request) throw new NotFoundException('Request not found');
+    return request;
+  }
+
+  async assignRequest(id: string, assigneeId: string) {
+    const request = await this.model.findByIdAndUpdate(
+      id,
+      { 
+        assignedTo: new Types.ObjectId(assigneeId),
+        status: 'IN_PROGRESS' 
+      },
+      { new: true }
+    ).populate('assignedTo', 'name email');
+
+    if (!request) throw new NotFoundException('Request not found');
+    this.logger.log(`Assigned Request ${id} to User ${assigneeId}`);
+    return request;
+  }
+
+  async getDashboardStats(category?: string) {
+    // Tạo bộ lọc: Nếu có category thì lọc, nếu không thì lấy tất cả
+    const matchStage: any = {};
+    if (category && category !== 'ALL') {
+      matchStage.category = category;
+    }
+
+    const stats = await this.model.aggregate([
+      // Bước 1: Lọc dữ liệu theo category trước (nếu có)
+      { $match: matchStage },
+      
+      // Bước 2: Gom nhóm tính toán
+      {
+        $facet: {
+          statusCounts: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+          categoryCounts: [{ $group: { _id: "$category", count: { $sum: 1 } } }],
+          urgentCount: [{ $match: { priority: "URGENT" } }, { $count: "count" }]
+        }
+      }
+    ]);
+    return stats[0] || {};
+  }
+
+  // ======================================================
+  // [MỚI] CHỨC NĂNG XUẤT EXCEL
+  // ======================================================
+  async exportToExcel() {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Danh sách yêu cầu');
+
+    // Định nghĩa cột
+    sheet.columns = [
+      { header: 'Mã YC', key: '_id', width: 25 },
+      { header: 'Tiêu đề', key: 'title', width: 30 },
+      { header: 'Danh mục', key: 'category', width: 15 },
+      { header: 'Mức độ', key: 'priority', width: 12 },
+      { header: 'Trạng thái', key: 'status', width: 15 },
+      { header: 'Người tạo', key: 'requester', width: 20 },
+      { header: 'Người xử lý', key: 'assignee', width: 20 },
+      { header: 'Ngày tạo', key: 'createdAt', width: 20 },
+      { header: 'Hạn xử lý', key: 'dueDate', width: 20 },
+    ];
+
+    // Lấy dữ liệu
+    const requests = await this.model
+      .find()
+      .populate('requester', 'name')
+      .populate('assignedTo', 'name')
+      .sort({ createdAt: -1 })
+      .exec();
+
+    // Ghi dữ liệu vào file
+    requests.forEach((item) => {
+      // [FIX QUAN TRỌNG] Ép kiểu sang any để tránh lỗi build TypeScript
+      const req = item as any; 
+      
+      sheet.addRow({
+        _id: req._id ? req._id.toString() : '',
+        title: req.title,
+        category: req.category,
+        priority: req.priority,
+        status: req.status,
+        requester: req.requester?.name || '',
+        assignee: req.assignedTo?.name || '',
+        createdAt: req.createdAt ? new Date(req.createdAt).toLocaleString() : '',
+        dueDate: req.dueDate ? new Date(req.dueDate).toLocaleString() : '',
+      });
+    });
+
+    // Style đơn giản cho header
+    sheet.getRow(1).font = { bold: true };
+    
+    return workbook;
+  }
+
+  // ======================================================
+  // [MỚI] CHỨC NĂNG SLA MONITORING (CRON JOB)
+  // ======================================================
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async checkSlaBreach() {
+    this.logger.log('🔄 Đang quét SLA...');
+    const now = new Date();
+    
+    // Tìm ticket chưa xong & quá hạn & chưa đánh dấu
+    const overdueRequests = await this.model.find({
+      status: { $nin: ['COMPLETED', 'CANCELLED', 'REJECTED'] }, 
+      dueDate: { $lt: now },
+      'custom.isSlaBreached': { $ne: true }
+    });
+
+    if (overdueRequests.length > 0) {
+      this.logger.warn(`⚠️ Phát hiện ${overdueRequests.length} ticket vi phạm SLA!`);
+      
+      for (const req of overdueRequests) {
+        req.custom = { ...req.custom, isSlaBreached: true };
+        
+        req.comments.push({
+            content: `⚠️ [HỆ THỐNG] Ticket này đã quá hạn xử lý vào lúc ${now.toLocaleString()}`,
+            createdAt: now,
+            isInternal: true,
+            author: null as any
+        });
+
+        await req.save();
+      }
+    }
   }
 }

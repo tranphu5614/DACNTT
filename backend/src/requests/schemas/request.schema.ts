@@ -1,4 +1,3 @@
-// backend/src/requests/schemas/request.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -6,8 +5,9 @@ export type RequestDocument = Request & Document;
 
 @Schema({ timestamps: true })
 export class Request {
+  // Cho phép category tự do thay vì Enum cứng
   @Prop({ required: true })
-  category!: 'HR' | 'IT';
+  category!: string; 
 
   @Prop({ required: true })
   typeKey!: string;
@@ -21,92 +21,61 @@ export class Request {
   @Prop()
   priority?: string;
 
-  // TRẠNG THÁI YÊU CẦU
   @Prop({
     default: 'NEW',
     enum: ['NEW', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
   })
   status!: string;
 
-  @Prop({ type: Object })
-  custom?: any;
-
-  // Người tạo yêu cầu
+  // Người tạo
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   requester!: Types.ObjectId;
 
-  // --- Đặt phòng (nếu có) ---
-  @Prop()
-  bookingRoomKey?: string;
+  // --- MỚI: NGƯỜI ĐƯỢC GIAO VIỆC ---
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  assignedTo?: Types.ObjectId;
 
-  @Prop()
-  bookingStart?: Date;
-
-  @Prop()
-  bookingEnd?: Date;
-
-  // --- File đính kèm ---
+  // --- MỚI: HỆ THỐNG COMMENT ---
   @Prop({
-    type: [
-      {
-        filename: String,
-        path: String,
-        size: Number,
-        mimetype: String,
-      },
-    ],
+    type: [{
+      content: { type: String, required: true },
+      author: { type: Types.ObjectId, ref: 'User' },
+      createdAt: { type: Date, default: Date.now },
+      isInternal: { type: Boolean, default: false } // Comment nội bộ chỉ quản lý thấy
+    }],
     default: [],
   })
-  attachments?: {
-    filename: string;
-    path: string;
-    size: number;
-    mimetype: string;
+  comments!: {
+    content: string;
+    author: Types.ObjectId;
+    createdAt: Date;
+    isInternal: boolean;
   }[];
 
-  // --- Quy trình duyệt ---
-  @Prop({
-    default: 'NONE',
-  })
-  approvalStatus!: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+  // --- MỚI: SLA & DEADLINE ---
+  @Prop()
+  dueDate?: Date;
+
+  // Các trường cũ giữ nguyên
+  @Prop({ type: Object })
+  custom?: any;
+
+  @Prop({ type: [Object], default: [] })
+  attachments?: any[];
+
+  @Prop({ default: 'NONE' })
+  approvalStatus!: string;
 
   @Prop({ type: Number, default: 0 })
   currentApprovalLevel!: number;
 
-  @Prop({
-    type: [
-      {
-        level: Number,
-        role: String,
-        approver: { type: Types.ObjectId, ref: 'User' },
-        approvedAt: Date,
-        decision: String,
-        comment: String,
-      },
-    ],
-    default: [],
-  })
-  approvals!: {
-    level: number;
-    role: string;
-    approver?: Types.ObjectId;
-    approvedAt?: Date;
-    decision?: 'APPROVED' | 'REJECTED';
-    comment?: string;
-  }[];
+  @Prop({ type: [Object], default: [] })
+  approvals!: any[];
 
-  // =============== PHẦN MỚI  ===============
-
-  // Gợi ý sửa lỗi do AI phân tích
   @Prop({ type: String })
   aiSuggestion?: string;
 
-  // Kết quả tự sửa lỗi của người dùng
-  @Prop({
-    type: String,
-    enum: ['FIXED', 'NOT_FIXED', null],
-    default: null,
-  })
+  @Prop({ type: String, enum: ['FIXED', 'NOT_FIXED', null], default: null })
   selfFixResult!: 'FIXED' | 'NOT_FIXED' | null;
 }
 
