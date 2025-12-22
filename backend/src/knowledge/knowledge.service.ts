@@ -1,13 +1,17 @@
-import { Injectable, Logger, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { RequestsService } from '../requests/requests.service';
 
 @Injectable()
-export class KnowledgeService implements OnModuleInit {
+export class KnowledgeService {
   private readonly logger = new Logger(KnowledgeService.name);
   private readonly API_KEY: string;
-  private baseUrl: string;
-  private currentModelName: string = 'gemini-pro';
+  private readonly baseUrl: string;
+  
+  // -----------------------------------------------------------
+  // CHUYỂN QUA GEMMA: Dùng bản 27B-IT
+  // -----------------------------------------------------------
+  private readonly MODEL_NAME = 'gemma-3-1b-it';
 
   constructor(
     private configService: ConfigService,
@@ -15,100 +19,93 @@ export class KnowledgeService implements OnModuleInit {
     private requestsService: RequestsService,
   ) {
     this.API_KEY = this.configService.get<string>('GEMINI_API_KEY') || '';
-    this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent`;
+    
+    // Gemma dùng chung endpoint với Gemini trên Google AI Studio
+    this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL_NAME}:generateContent`;
+
+    if (!this.API_KEY) {
+        this.logger.error('❌ Missing GEMINI_API_KEY in .env');
+    } else {
+        this.logger.log(`✅ KnowledgeService: Active with Gemma Model "${this.MODEL_NAME}"`);
+    }
   }
 
-  async onModuleInit() {
-    if (!this.API_KEY) return;
-    await this.findFreeModel();
+  // --- Hàm "gọt vỏ" JSON: Gemma hay trả về kèm Markdown ---
+  private cleanJsonString(input: string): string {
+    let cleaned = input.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    return cleaned;
   }
 
-  private async findFreeModel() {
-    try {
-      this.logger.log('🔍 Auto-detecting best FREE model...');
-      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.API_KEY}`;
-      const response = await fetch(listUrl);
-      if (!response.ok) return;
-      const data = await response.json();
-      const models = data.models || [];
-      const bestModel = 
-        models.find((m: any) => m.name.includes('gemini-1.5-flash')) || 
-        models.find((m: any) => m.name.includes('gemini-pro')) ||
-        models.find((m: any) => m.supportedGenerationMethods?.includes('generateContent'));
-
-      if (bestModel) {
-        this.currentModelName = bestModel.name;
-        this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/${this.currentModelName}:generateContent`;
-        this.logger.log(`✅ AI Model: ${this.currentModelName}`);
-      }
-    } catch (e) { /* ignore */ }
-  }
-
-  // Giữ nguyên hàm autocomplete cho chức năng gợi ý search
+  // --- 1. Autocomplete ---
   async autocomplete(query: string) {
     if (!query || query.trim().length < 3) return [];
     if (!this.API_KEY) return [];
+    
     try {
-        const prompt = `Task: Identify if IT issue is COMPLEX (return "COMPLEX_ISSUE") or SIMPLE (return short solution). Input: "${query}"`;
+        const prompt = `
+        Role: IT Specialist.
+        Task: Analyze user input: "${query}".
+        Output: If complex, return "COMPLEX_ISSUE". If simple, return a short solution string (max 10 words).
+        Do not explain. Just the string.`;
+        
         const response = await fetch(`${this.baseUrl}?key=${this.API_KEY}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
         });
+
         if(!response.ok) return [];
+        
         const data = await response.json();
-        const ans = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        let ans = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        
+        ans = ans?.replace(/['"]/g, '');
+
         if (!ans || ans.includes('COMPLEX_ISSUE')) return [];
-        return [{ id: 'ai-auto', title: '💡 Gợi ý (AI)', suggestion: ans, score: 1 }];
+        
+        return [{ id: 'ai-auto', title: '💡 Gợi ý (Gemma)', suggestion: ans, score: 1 }];
     } catch { return []; }
   }
 
-  // --- Hàm Chatbot xử lý Ticket ---
+  // --- 2. Chatbot ---
   async chat(history: { role: 'user' | 'model'; parts: string }[], message: string, userId: string) {
     if (!this.API_KEY) return "Hệ thống chưa cấu hình API Key.";
 
-    // 1. Lấy ngày giờ thực tế
     const now = new Date();
-    const todayStr = now.toLocaleDateString('vi-VN', { 
-      timeZone: 'Asia/Ho_Chi_Minh', 
-      weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' 
-    });
-    // Format YYYY-MM-DD để dễ tính toán
-    const isoDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const todayStr = now.toLocaleDateString('vi-VN');
 
     const systemInstruction = `
-      Bạn là Trợ lý ảo AI Agent của hệ thống.
-      THÔNG TIN QUAN TRỌNG: Hôm nay là ${todayStr} (ISO: ${isoDate}).
-      
-      NHIỆM VỤ:
-      1. Trả lời câu hỏi IT/HR thân thiện.
-      2. NẾU user muốn tạo yêu cầu (nghỉ phép, máy lỗi, WFH...), hãy trả về JSON để hệ thống xử lý.
-      3. Nếu không rõ hoặc không thể xử lý, hãy trả lời "Tôi không thể giúp với yêu cầu này."
-      4. Trả lời theo ngôn ngữ mà người dùng hỏi.
-
-      FORMAT JSON (Bắt buộc đúng định dạng này, không thêm markdown):
-      {
-        "action": "CREATE_TICKET",
-        "data": {
-          "category": "HR" | "IT",
-          "typeKey": "leave_request" (nghỉ phép) | "it_support" (IT) | "wfh_request" (WFH),
-          "title": "Tóm tắt yêu cầu",
-          "description": "Chi tiết yêu cầu",
-          "priority": "MEDIUM",
-          "custom": {
-            // Leave: "from", "to" (YYYY-MM-DD), "reason"
-            // WFH: "date" (YYYY-MM-DD), "note"
-            // IT: "device" (laptop/pc), "problem"
-          }
-        }
+    You are an internal IT/HR Assistant. Current date: ${todayStr}.
+    
+    RULES:
+    1. Answer friendly in Vietnamese for normal questions.
+    2. IF user wants to create a request (leave, IT support, WFH), YOU MUST OUTPUT JSON ONLY.
+    3. DO NOT use Markdown formatting for JSON (no \`\`\`).
+    
+    REQUIRED JSON FORMAT for requests:
+    {
+      "action": "CREATE_TICKET",
+      "data": {
+        "category": "HR" (or "IT"),
+        "typeKey": "leave_request" (or "it_support", "wfh_request"),
+        "title": "Short summary",
+        "description": "Full detail",
+        "priority": "MEDIUM",
+        "custom": {}
       }
-      
-      Ví dụ: "Xin nghỉ phép ngày mai vì ốm" (Hôm nay 2025-11-27)
-      -> JSON: { "action": "CREATE_TICKET", "data": { "category": "HR", "typeKey": "leave_request", "title": "Nghỉ phép 2025-11-28", "description": "Xin nghỉ ốm", "custom": { "from": "2025-11-28", "to": "2025-11-28", "reason": "Ốm" } } }
+    }
     `;
 
     const contents = [
       { role: 'user', parts: [{ text: systemInstruction }] },
+      { role: 'model', parts: [{ text: "Ok, I understand. I will output strictly formatted JSON for requests and Vietnamese text for chat." }] },
       ...history.map(h => ({ role: h.role, parts: [{ text: h.parts }] })),
       { role: 'user', parts: [{ text: message }] }
     ];
@@ -120,26 +117,29 @@ export class KnowledgeService implements OnModuleInit {
         body: JSON.stringify({ contents })
       });
 
-      if (!response.ok) return "Lỗi kết nối AI Service.";
+      if (!response.ok) {
+          const errText = await response.text();
+          this.logger.error(`Gemma Error: ${errText}`);
+          return "Gemma đang bận, thử lại sau nhé.";
+      }
 
       const data = await response.json();
-      const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Không có phản hồi.";
+      const replyText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-      // 2. Kiểm tra xem AI có trả về lệnh JSON không
-      const jsonMatch = replyText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
+      // Kiểm tra xem có JSON trong câu trả lời không
+      if (replyText.includes('{') && replyText.includes('CREATE_TICKET')) {
         try {
-          const command = JSON.parse(jsonMatch[0]);
+          const cleanText = this.cleanJsonString(replyText);
+          const command = JSON.parse(cleanText);
+
           if (command.action === 'CREATE_TICKET' && command.data) {
-            this.logger.log(`🤖 AI Creating Ticket for ${userId}`);
-            
-            // Gọi Service tạo ticket
+            this.logger.log(`🤖 Gemma Creating Ticket for ${userId}`);
             const result = await this.requestsService.createWithRequester(userId, command.data, []);
-            
-            return `✅ Đã tạo yêu cầu thành công!\n\n📌 Mã phiếu: #${result._id}\n📝 Tiêu đề: ${result.title}\n\nBạn có thể kiểm tra trong mục "Yêu cầu của tôi".`;
+            return `✅ Đã tạo phiếu thành công (Gemma)!\n\n📌 ID: #${result._id}\n📝 ${result.title}`;
           }
         } catch (err) {
-          this.logger.warn('AI trả về JSON lỗi, hiển thị text gốc.');
+            // FIX LỖI Ở ĐÂY: Ép kiểu err thành 'any' để lấy message
+            this.logger.warn(`Lỗi parse JSON Gemma: ${(err as any).message}`);
         }
       }
 
@@ -147,7 +147,7 @@ export class KnowledgeService implements OnModuleInit {
 
     } catch (e) {
       this.logger.error('Chat Exception', e);
-      return "Hệ thống đang bận, vui lòng thử lại sau.";
+      return "Lỗi kết nối AI.";
     }
   }
 }

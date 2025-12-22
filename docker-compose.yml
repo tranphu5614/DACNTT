@@ -23,7 +23,7 @@ services:
       # Kết nối tới service 'mongodb' thay vì 'localhost'
       - MONGO_URI=mongodb://mongodb:27017/reqsys
       - JWT_SECRET=supersecret_key_change_this
-      - GEMINI_API_KEY= AIzaSyBf6x6X4Bj2ADbr1YIq-hGI6HYSPvvkyEA
+      - GEMINI_API_KEY= 
     ports:
       - "3000:3000"
     env_file:
