@@ -29,8 +29,6 @@ export interface CommentItem {
 export interface MyRequestItem {
   _id: string;
   title: string;
-  
-  // [FIX] Bổ sung 2 trường thiếu gây lỗi build
   description?: string; 
   typeKey: string;      
 
@@ -39,24 +37,22 @@ export interface MyRequestItem {
   priority?: RequestPriority;
   createdAt: string;
   updatedAt: string;
+  dueDate?: string; // [New] SLA
 
-  // [NEW] Người tạo
+  // Người tạo & Người xử lý
   requester?: UserShort;
-
-  // [NEW] Người được giao việc
   assignedTo?: UserShort;
 
-  // [NEW] Danh sách bình luận
+  // Dữ liệu mở rộng
   comments?: CommentItem[];
-
-  // [NEW] File đính kèm
   attachments?: Array<{
     filename: string;
     path: string;
     mimetype: string;
   }>;
+  custom?: Record<string, any>;
 
-  // --- Quy trình duyệt ---
+  // Quy trình duyệt
   approvalStatus?: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
   currentApprovalLevel?: number;
   approvals?: Array<{
@@ -68,13 +64,10 @@ export interface MyRequestItem {
     approver?: UserShort;
   }>;
 
-  // --- Booking Info ---
+  // Booking Info
   bookingRoomKey?: string;
   bookingStart?: string;
   bookingEnd?: string;
-  
-  // Custom fields
-  custom?: Record<string, any>;
 }
 
 // =============================================================================
@@ -104,10 +97,7 @@ export function apiCreateRequest(
   fd.append('title', payload.title);
   fd.append('description', payload.description);
 
-  if (payload.priority) {
-    fd.append('priority', payload.priority);
-  }
-
+  if (payload.priority) fd.append('priority', payload.priority);
   if (payload.bookingStart) fd.append('bookingStart', payload.bookingStart);
   if (payload.bookingEnd) fd.append('bookingEnd', payload.bookingEnd);
   if (payload.bookingRoomKey) fd.append('bookingRoomKey', payload.bookingRoomKey);
@@ -123,19 +113,11 @@ export function apiMyRequests(
   params: { page?: number; limit?: number } = {}
 ) {
   if (!token) throw new Error('Missing token');
-
-  const page = Math.max(1, Math.floor(params.page ?? 1));
-  const limit = Math.min(200, Math.max(1, Math.floor(params.limit ?? 20)));
-
-  const q = new URLSearchParams();
-  q.set('page', String(page));
-  q.set('limit', String(limit));
-
-  return request<ListResponse<MyRequestItem>>(
-    `/requests/mine?${q.toString()}`,
-    { method: 'GET' },
-    token
-  );
+  const q = new URLSearchParams({
+    page: String(params.page || 1),
+    limit: String(params.limit || 20)
+  });
+  return request<ListResponse<MyRequestItem>>(`/requests/mine?${q.toString()}`, { method: 'GET' }, token);
 }
 
 export function apiQueueRequests(
@@ -150,23 +132,15 @@ export function apiQueueRequests(
   }
 ) {
   if (!token) throw new Error('Missing token');
-
-  const page = Math.max(1, Math.floor(params.page ?? 1));
-  const limit = Math.min(200, Math.max(1, Math.floor(params.limit ?? 20)));
-
   const q = new URLSearchParams();
   q.set('category', params.category);
-  q.set('page', String(page));
-  q.set('limit', String(limit));
+  q.set('page', String(params.page || 1));
+  q.set('limit', String(params.limit || 20));
   if (params.status) q.set('status', params.status);
   if (params.priority) q.set('priority', params.priority);
   if (params.q) q.set('q', params.q);
 
-  return request<ListResponse<MyRequestItem>>(
-    `/requests/queue?${q.toString()}`,
-    { method: 'GET' },
-    token
-  );
+  return request<ListResponse<MyRequestItem>>(`/requests/queue?${q.toString()}`, { method: 'GET' }, token);
 }
 
 // =============================================================================
@@ -178,12 +152,7 @@ export function apiGetRequestDetail(token: string, id: string) {
   return request<MyRequestItem>(`/requests/${id}`, { method: 'GET' }, token);
 }
 
-export function apiAddComment(
-  token: string, 
-  requestId: string, 
-  content: string, 
-  isInternal: boolean = false
-) {
+export function apiAddComment(token: string, requestId: string, content: string, isInternal: boolean = false) {
   if (!token) throw new Error('Missing token');
   return request<MyRequestItem>(
     `/requests/${requestId}/comments`, 
@@ -209,39 +178,41 @@ export function apiAssignRequest(token: string, requestId: string, assigneeId: s
   );
 }
 
-export function apiApproveRequest(token: string, id: string, comment?: string) {
+// [MỚI - QUAN TRỌNG] Cập nhật trạng thái (Hoàn thành / Hủy)
+export function apiUpdateStatus(token: string, id: string, status: string) {
   if (!token) throw new Error('Missing token');
   return request(
-    `/requests/${id}/approve`,
+    `/requests/${id}/status`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ comment }),
+      body: JSON.stringify({ status }),
     },
     token
   );
+}
+
+export function apiApproveRequest(token: string, id: string, comment?: string) {
+  if (!token) throw new Error('Missing token');
+  return request(`/requests/${id}/approve`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment }),
+    }, token);
 }
 
 export function apiRejectRequest(token: string, id: string, comment?: string) {
   if (!token) throw new Error('Missing token');
-  return request(
-    `/requests/${id}/reject`,
-    {
+  return request(`/requests/${id}/reject`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comment }),
-    },
-    token
-  );
+    }, token);
 }
 
 export function apiPendingApproval(token: string) {
   if (!token) throw new Error('Missing token');
-  return request<MyRequestItem[]>(
-    '/requests/pending-approval',
-    { method: 'GET' },
-    token
-  );
+  return request<MyRequestItem[]>('/requests/pending-approval', { method: 'GET' }, token);
 }
 
 // =============================================================================
@@ -250,29 +221,24 @@ export function apiPendingApproval(token: string) {
 
 export function apiGetDashboardStats(token: string, category?: string) {
   if (!token) throw new Error('Missing token');
-  
   const q = new URLSearchParams();
   if (category && category !== 'ALL') q.set('category', category);
-  
   return request<any>(`/requests/dashboard/stats?${q.toString()}`, { method: 'GET' }, token);
 }
 
 export async function apiExportRequests(token: string) {
-  // Lấy URL gốc từ biến môi trường hoặc mặc định localhost
+  // Lấy URL gốc (ví dụ http://localhost:3000)
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   
-  // SỬA: Xóa "/api" ở đầu đường dẫn
+  // SỬA: Xóa "/api" ở đầu đường dẫn để khớp với backend
   const url = `${baseURL}/requests/export/excel`;
 
   const res = await fetch(url, {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!res.ok) {
-    // Đọc lỗi từ backend để debug dễ hơn
     const errText = await res.text();
     console.error("Export Error:", res.status, errText);
     throw new Error(`Export failed: ${res.status}`);
@@ -280,30 +246,10 @@ export async function apiExportRequests(token: string) {
   return res.blob();
 }
 
-export function apiGetAvailableRooms(
-  token: string, 
-  date: string, 
-  from: string, 
-  to: string, 
-  size: number
-) {
+export function apiGetAvailableRooms(token: string, date: string, from: string, to: string, size: number) {
   if (!token) throw new Error('Missing token');
-  const q = new URLSearchParams();
-  q.set('date', date);
-  q.set('from', from);
-  q.set('to', to);
-  q.set('size', String(size));
-
+  const q = new URLSearchParams({ date, from, to, size: String(size) });
   return request<Array<{
-    key: string; 
-    name: string; 
-    size: number; 
-    isBusy: boolean; 
-    value: string; 
-    label: string 
-  }>>(
-    `/requests/available-rooms?${q.toString()}`,
-    { method: 'GET' },
-    token
-  );
+    key: string; name: string; size: number; isBusy: boolean; value: string; label: string 
+  }>>(`/requests/available-rooms?${q.toString()}`, { method: 'GET' }, token);
 }

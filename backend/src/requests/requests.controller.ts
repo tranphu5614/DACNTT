@@ -9,12 +9,12 @@ import {
   Post,
   Query,
   Req,
-  Res, // [MỚI] Dùng cho Export Excel
+  Res,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { Response } from 'express'; // [MỚI] Type cho Response
+import { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequestsService } from './requests.service';
@@ -33,14 +33,14 @@ export class RequestsController {
   // 1. CÁC API THỐNG KÊ & DANH SÁCH (QUAN TRỌNG: Đặt lên trên cùng)
   // ==================================================================
 
-  // [MỚI] Thống kê Dashboard
+  // [DASHBOARD] Thống kê (Hỗ trợ lọc theo Category)
   @UseGuards(JwtAuthGuard)
   @Get('dashboard/stats')
-  async getStats(@Query('category') category?: string) { // <--- Thêm tham số này
+  async getStats(@Query('category') category?: string) {
     return this.requestsService.getDashboardStats(category);
   }
 
-  // [MỚI] Xuất báo cáo Excel
+  // [EXCEL] Xuất báo cáo
   @UseGuards(JwtAuthGuard)
   @Get('export/excel')
   async exportExcel(@Res() res: Response) {
@@ -59,7 +59,7 @@ export class RequestsController {
     res.end();
   }
 
-  // Kiểm tra phòng họp trống
+  // [ROOMS] Kiểm tra phòng họp trống
   @UseGuards(JwtAuthGuard)
   @Get('available-rooms')
   async availableRooms(
@@ -71,7 +71,7 @@ export class RequestsController {
     return this.requestsService.getAvailableRooms(date, from, to, size);
   }
 
-  // "Yêu cầu của tôi"
+  // [MY REQUESTS] Yêu cầu của tôi
   @UseGuards(JwtAuthGuard)
   @Get('mine')
   async mine(
@@ -86,12 +86,12 @@ export class RequestsController {
     return this.requestsService.listMine(userId, p, l);
   }
 
-  // Hàng chờ xử lý (Generic cho mọi phòng ban)
+  // [QUEUE] Hàng chờ xử lý (Generic cho mọi phòng ban)
   @UseGuards(JwtAuthGuard)
   @Get('queue')
   async queue(
     @Req() req: any,
-    @Query('category') category: string, // String bất kỳ (HR, IT, SALES...)
+    @Query('category') category: string,
     @Query('status') status?: string,
     @Query('priority') priority?: string,
     @Query('q') q?: string,
@@ -120,7 +120,7 @@ export class RequestsController {
     return this.requestsService.listQueue({ category, status, priority, q }, p, l);
   }
 
-  // Lấy danh sách cần duyệt (Approval)
+  // [APPROVAL] Lấy danh sách cần duyệt
   @UseGuards(JwtAuthGuard)
   @Get('pending-approval')
   async pendingApproval(@Req() req: any) {
@@ -154,7 +154,7 @@ export class RequestsController {
     return this.requestsService.getById(id);
   }
 
-  // [MỚI] Thêm Comment
+  // Thêm Comment
   @UseGuards(JwtAuthGuard)
   @Post(':id/comments')
   async addComment(
@@ -167,7 +167,7 @@ export class RequestsController {
     return this.requestsService.addComment(id, userId, body.content, !!body.isInternal);
   }
 
-  // [MỚI] Giao việc (Assign)
+  // Giao việc (Assign)
   @UseGuards(JwtAuthGuard)
   @Patch(':id/assign')
   async assignRequest(
@@ -176,12 +176,21 @@ export class RequestsController {
     @Body() body: { assigneeId: string },
   ) {
     const roles: string[] = (req?.user?.roles ?? []).map((r: any) => String(r).toUpperCase());
-    // Chỉ Admin hoặc các Manager mới được giao việc
     if (!roles.includes('ADMIN') && !roles.includes('MANAGER') && !roles.includes('IT_MANAGER') && !roles.includes('HR_MANAGER')) {
        throw new ForbiddenException('Bạn không có quyền giao việc.');
     }
-    
     return this.requestsService.assignRequest(id, body.assigneeId);
+  }
+
+  // [MỚI] Cập nhật trạng thái thủ công (COMPLETED / CANCELLED)
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body('status') status: string,
+  ) {
+    return this.requestsService.updateStatus(id, status, req.user);
   }
 
   // Duyệt (Approve)
@@ -195,6 +204,7 @@ export class RequestsController {
     return this.requestsService.approve(id, req.user, comment);
   }
 
+  
   // Từ chối (Reject)
   @UseGuards(JwtAuthGuard)
   @Patch(':id/reject')

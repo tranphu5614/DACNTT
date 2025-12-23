@@ -8,9 +8,9 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Cron, CronExpression } from '@nestjs/schedule'; // <--- IMPORT CRON
-import * as ExcelJS from 'exceljs'; // <--- IMPORT EXCEL
-import { Request as RequestEntity, RequestDocument } from './schemas/request.schema';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import * as ExcelJS from 'exceljs';
+import { Request as RequestEntity, RequestDocument, RequestStatus } from './schemas/request.schema';
 import { ROOMS, RoomSize } from './rooms.constants';
 import { DEFAULT_CATALOG } from '../catalog/catalog.data';
 import { ERROR_SUGGESTIONS } from './suggestions.data';
@@ -24,7 +24,7 @@ export class RequestsService {
 
   constructor(
     @InjectModel(RequestEntity.name)
-    private readonly model: Model<RequestDocument>,
+    private readonly requestModel: Model<RequestDocument>,
     private readonly priorityClassifier: PriorityClassifierService,
   ) {}
 
@@ -32,7 +32,9 @@ export class RequestsService {
     return DEFAULT_CATALOG.find((c) => c.typeKey === typeKey);
   }
 
-  // --- 1. LOGIC ĐẶT PHÒNG ---
+  // ==================================================================
+  // 1. LOGIC ĐẶT PHÒNG
+  // ==================================================================
   async getAvailableRooms(dateStr: string, fromStr: string, toStr: string, size: RoomSize) {
     if (!dateStr || !fromStr || !toStr) return [];
 
@@ -49,7 +51,7 @@ export class RequestsService {
       throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu');
     }
 
-    const busy = (await this.model
+    const busy = (await this.requestModel
       .find({
         typeKey: 'meeting_room_booking',
         approvalStatus: { $ne: 'REJECTED' },
@@ -74,12 +76,15 @@ export class RequestsService {
       }));
   }
 
-  // --- 2. TẠO REQUEST ---
+  // ==================================================================
+  // 2. TẠO REQUEST (CREATE)
+  // ==================================================================
   async createWithRequester(
     requesterId: string,
     dto: any,
     files: Express.Multer.File[] = [],
   ) {
+    // 2.1 Parse Custom Fields
     if (typeof dto?.custom === 'string') {
       try {
         dto.custom = JSON.parse(dto.custom);
@@ -88,6 +93,7 @@ export class RequestsService {
       }
     }
 
+    // 2.2 AI Auto-Priority
     if (!dto.priority) {
       const textParts = [dto.title, dto.description].filter(Boolean);
       const textToAnalyze = textParts.join('. ');
@@ -100,6 +106,7 @@ export class RequestsService {
       }
     }
 
+    // 2.3 Lấy quy trình duyệt
     const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
     const approvalsFromCatalog =
       catalog?.approvalFlow?.map((s) => ({
@@ -109,12 +116,13 @@ export class RequestsService {
 
     const hasApproval = approvalsFromCatalog.length > 0;
 
+    // 2.4 Validate Logic Đặt phòng
     if (dto?.typeKey === 'meeting_room_booking') {
       const c = dto.custom || {};
       const { size, bookingDate, fromTime, toTime, roomKey } = c;
 
       if (!size || !bookingDate || !fromTime || !toTime || !roomKey) {
-        throw new BadRequestException('Thiếu thông tin đặt phòng (size, date, time, room)');
+        throw new BadRequestException('Thiếu thông tin đặt phòng');
       }
 
       const startDt = new Date(`${bookingDate}T${fromTime}:00`);
@@ -124,7 +132,7 @@ export class RequestsService {
         throw new BadRequestException('Khoảng thời gian không hợp lệ');
       }
 
-      const conflict = await this.model.findOne({
+      const conflict = await this.requestModel.findOne({
         typeKey: 'meeting_room_booking',
         approvalStatus: { $ne: 'REJECTED' },
         bookingRoomKey: roomKey,
@@ -133,7 +141,7 @@ export class RequestsService {
       });
 
       if (conflict) {
-        throw new ConflictException('Phòng đã bị đặt trong khung giờ này, vui lòng chọn lại.');
+        throw new ConflictException('Phòng đã bị đặt trong khung giờ này.');
       }
 
       dto.bookingRoomKey = roomKey;
@@ -141,6 +149,7 @@ export class RequestsService {
       dto.bookingEnd = endDt;
     }
 
+    // 2.5 Xử lý File
     const attachments = (files || []).map((f) => ({
       filename: f.originalname,
       path: f.filename,
@@ -148,19 +157,20 @@ export class RequestsService {
       mimetype: f.mimetype,
     }));
 
-    // Tính toán hạn xử lý (SLA) đơn giản: URGENT = 4h, HIGH = 24h, khác = 3 ngày
+    // 2.6 Tính toán SLA
     let dueDate = new Date();
     if (dto.priority === 'URGENT') dueDate.setHours(dueDate.getHours() + 4);
     else if (dto.priority === 'HIGH') dueDate.setHours(dueDate.getHours() + 24);
     else dueDate.setDate(dueDate.getDate() + 3);
 
-    const doc = await this.model.create({
+    // 2.7 Lưu vào Database
+    const doc = await this.requestModel.create({
       category: dto.category,
       typeKey: dto.typeKey,
       title: dto.title,
       description: dto.description,
       priority: dto.priority,
-      status: dto.status ?? 'NEW',
+      status: dto.status ?? RequestStatus.NEW, // [FIX] Dùng Enum
       custom: dto.custom ?? {},
       bookingRoomKey: dto.bookingRoomKey,
       bookingStart: dto.bookingStart,
@@ -171,14 +181,17 @@ export class RequestsService {
       currentApprovalLevel: 0,
       approvalStatus: hasApproval ? 'PENDING' : 'NONE',
       assignedTo: null,
-      dueDate: dueDate, // Lưu hạn xử lý
+      dueDate: dueDate,
       comments: []
     });
 
     return doc;
   }
 
-  // --- 3. CÁC CHỨC NĂNG LIST/GET ---
+  // ==================================================================
+  // 3. CÁC CHỨC NĂNG LẤY DANH SÁCH (READ)
+  // ==================================================================
+  
   async listMine(userId: string, page = 1, limit = 10) {
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
@@ -186,7 +199,7 @@ export class RequestsService {
     const skip = (p - 1) * l;
 
     const [items, total] = await Promise.all([
-      this.model
+      this.requestModel
         .find({ requester: uid })
         .populate('requester', 'name email')
         .populate('assignedTo', 'name email')
@@ -195,7 +208,7 @@ export class RequestsService {
         .limit(l)
         .lean()
         .exec(),
-      this.model.countDocuments({ requester: uid }),
+      this.requestModel.countDocuments({ requester: uid }),
     ]);
     return { items, total, page: p, limit: l };
   }
@@ -218,7 +231,7 @@ export class RequestsService {
     }
 
     const [items, total] = await Promise.all([
-      this.model
+      this.requestModel
         .find(query)
         .populate('requester', 'name email')
         .populate('assignedTo', 'name email')
@@ -227,15 +240,15 @@ export class RequestsService {
         .limit(l)
         .lean()
         .exec(),
-      this.model.countDocuments(query),
+      this.requestModel.countDocuments(query),
     ]);
     return { items, total, page: p, limit: l };
   }
 
   async getById(id: string) {
-    const doc = await this.model
+    const doc = await this.requestModel
       .findById(id)
-      .populate('requester', 'name email department')
+      .populate('requester', 'name email department phoneNumber') // Thêm phoneNumber
       .populate('assignedTo', 'name email')
       .populate('approvals.approver', 'name email')
       .populate('comments.author', 'name email')
@@ -244,14 +257,15 @@ export class RequestsService {
     return doc;
   }
 
-  // --- 4. APPROVE/REJECT ---
+  // ==================================================================
+  // 4. QUY TRÌNH DUYỆT (APPROVE/REJECT)
+  // ==================================================================
   async listPendingForApprover(user: { _id: string; roles?: string[] }) {
     const roles = user.roles || [];
     if (!roles.length) return [];
 
-    return this.model
+    return this.requestModel
       .find({
-        requester: { $ne: new Types.ObjectId(user._id) },
         approvalStatus: { $in: ['PENDING', 'IN_REVIEW'] },
         approvals: {
           $elemMatch: {
@@ -267,12 +281,8 @@ export class RequestsService {
   }
 
   async approve(id: string, user: { _id: string; roles?: string[] }, comment?: string) {
-    const doc = await this.model.findById(id);
+    const doc = await this.requestModel.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
-
-    if (doc.requester.toString() === user._id) {
-      throw new ForbiddenException('Bạn không thể tự duyệt yêu cầu của mình');
-    }
 
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');
@@ -288,8 +298,11 @@ export class RequestsService {
     }
 
     const userRoles = user.roles || [];
-    if (!userRoles.includes(step.role)) {
-      throw new ForbiddenException('Bạn không có quyền duyệt bước này');
+    const isAdmin = userRoles.includes('ADMIN');
+    const isApproverForStep = userRoles.includes(step.role);
+
+    if (!isAdmin && !isApproverForStep) {
+      throw new ForbiddenException(`Bạn không có quyền duyệt bước này (Cần role: ${step.role})`);
     }
 
     step.approver = new Types.ObjectId(user._id);
@@ -309,12 +322,8 @@ export class RequestsService {
   }
 
   async reject(id: string, user: { _id: string; roles?: string[] }, comment?: string) {
-    const doc = await this.model.findById(id);
+    const doc = await this.requestModel.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
-
-    if (doc.requester.toString() === user._id) {
-      throw new ForbiddenException('Bạn không thể tự duyệt/từ chối yêu cầu của mình');
-    }
 
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');
@@ -330,7 +339,10 @@ export class RequestsService {
     }
 
     const userRoles = user.roles || [];
-    if (!userRoles.includes(step.role)) {
+    const isAdmin = userRoles.includes('ADMIN');
+    const isApproverForStep = userRoles.includes(step.role);
+
+    if (!isAdmin && !isApproverForStep) {
       throw new ForbiddenException('Bạn không có quyền từ chối bước này');
     }
 
@@ -345,25 +357,12 @@ export class RequestsService {
     return doc;
   }
 
-  async suggestDescriptions(query: string): Promise<string[]> {
-    if (!query || query.trim().length < 2) return [];
-    const q = query.trim().toLowerCase();
-    return ERROR_SUGGESTIONS
-      .map((s) => ({
-        text: s,
-        score:
-          s.toLowerCase().includes(q) ? 2 :
-          s.toLowerCase().split(' ').some((w) => q.includes(w)) ? 1 : 0,
-      }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6)
-      .map((x) => x.text);
-  }
-
-  // --- 5. COMMENT & ASSIGN ---
+  // ==================================================================
+  // 5. TƯƠNG TÁC (COMMENT, ASSIGN, UPDATE STATUS)
+  // ==================================================================
+  
   async addComment(id: string, userId: string, content: string, isInternal: boolean) {
-    const request = await this.model.findByIdAndUpdate(
+    const request = await this.requestModel.findByIdAndUpdate(
       id,
       {
         $push: {
@@ -383,32 +382,103 @@ export class RequestsService {
   }
 
   async assignRequest(id: string, assigneeId: string) {
-    const request = await this.model.findByIdAndUpdate(
-      id,
-      { 
-        assignedTo: new Types.ObjectId(assigneeId),
-        status: 'IN_PROGRESS' 
-      },
-      { new: true }
-    ).populate('assignedTo', 'name email');
+    const doc = await this.requestModel.findById(id);
+    if (!doc) throw new NotFoundException('Request not found');
 
-    if (!request) throw new NotFoundException('Request not found');
+    if (doc.approvalStatus === 'PENDING') {
+      throw new BadRequestException('Yêu cầu này đang chờ duyệt, chưa thể giao việc.');
+    }
+    if (doc.approvalStatus === 'REJECTED') {
+      throw new BadRequestException('Yêu cầu này đã bị từ chối, không thể xử lý.');
+    }
+
+    doc.assignedTo = new Types.ObjectId(assigneeId);
+    
+    // [FIX] Sử dụng Enum RequestStatus thay vì string
+    doc.status = RequestStatus.IN_PROGRESS; 
+
+    await doc.save();
+    await doc.populate('assignedTo', 'name email');
+    
     this.logger.log(`Assigned Request ${id} to User ${assigneeId}`);
-    return request;
+    return doc;
   }
 
+  // Cập nhật trạng thái thủ công
+  async updateStatus(id: string, status: string, user: any) {
+    const currentUserId = user._id || user.userId || user.sub;
+    if (!currentUserId) {
+      throw new BadRequestException('Không xác định được User ID thực hiện thao tác.');
+    }
+    const currentUserIdStr = currentUserId.toString();
+
+    const request = await this.requestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Không tìm thấy yêu cầu.');
+    }
+
+    let assigneeIdStr = '';
+    if (request.assignedTo) {
+      const rawAssignee = request.assignedTo as any;
+      assigneeIdStr = rawAssignee._id ? rawAssignee._id.toString() : rawAssignee.toString();
+    }
+
+    const roles = (user.roles || []).map((r: string) => r.toUpperCase());
+    const isManager = roles.includes('ADMIN') || 
+                      roles.includes('MANAGER') || 
+                      roles.includes(`${request.category}_MANAGER`);
+    
+    if (status === RequestStatus.COMPLETED || status === RequestStatus.CANCELLED) {
+      if (assigneeIdStr !== currentUserIdStr && !isManager) {
+        const requesterIdStr = request.requester ? request.requester.toString() : '';
+        const isRequester = requesterIdStr === currentUserIdStr;
+
+        if (status === RequestStatus.CANCELLED && isRequester) {
+           // OK
+        } else {
+           throw new ForbiddenException('Bạn không có quyền cập nhật trạng thái này.');
+        }
+      }
+    }
+
+    // [FIX] Cast status về RequestStatus (hoặc đảm bảo đầu vào là enum)
+    request.status = status as RequestStatus;
+    
+    if (status === RequestStatus.COMPLETED) {
+      request.resolvedAt = new Date();
+    }
+
+    return request.save();
+  }
+
+  async suggestDescriptions(query: string): Promise<string[]> {
+    if (!query || query.trim().length < 2) return [];
+    const q = query.trim().toLowerCase();
+    return ERROR_SUGGESTIONS
+      .map((s) => ({
+        text: s,
+        score:
+          s.toLowerCase().includes(q) ? 2 :
+          s.toLowerCase().split(' ').some((w) => q.includes(w)) ? 1 : 0,
+      }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((x) => x.text);
+  }
+
+  // ==================================================================
+  // 6. DASHBOARD & EXCEL & SLA
+  // ==================================================================
+
   async getDashboardStats(category?: string) {
-    // Tạo bộ lọc: Nếu có category thì lọc, nếu không thì lấy tất cả
     const matchStage: any = {};
     if (category && category !== 'ALL') {
       matchStage.category = category;
     }
 
-    const stats = await this.model.aggregate([
-      // Bước 1: Lọc dữ liệu theo category trước (nếu có)
+    const stats = await this.requestModel.aggregate([
       { $match: matchStage },
-      
-      // Bước 2: Gom nhóm tính toán
       {
         $facet: {
           statusCounts: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
@@ -420,14 +490,10 @@ export class RequestsService {
     return stats[0] || {};
   }
 
-  // ======================================================
-  // [MỚI] CHỨC NĂNG XUẤT EXCEL
-  // ======================================================
   async exportToExcel() {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Danh sách yêu cầu');
 
-    // Định nghĩa cột
     sheet.columns = [
       { header: 'Mã YC', key: '_id', width: 25 },
       { header: 'Tiêu đề', key: 'title', width: 30 },
@@ -440,19 +506,15 @@ export class RequestsService {
       { header: 'Hạn xử lý', key: 'dueDate', width: 20 },
     ];
 
-    // Lấy dữ liệu
-    const requests = await this.model
+    const requests = await this.requestModel
       .find()
       .populate('requester', 'name')
       .populate('assignedTo', 'name')
       .sort({ createdAt: -1 })
       .exec();
 
-    // Ghi dữ liệu vào file
     requests.forEach((item) => {
-      // [FIX QUAN TRỌNG] Ép kiểu sang any để tránh lỗi build TypeScript
-      const req = item as any; 
-      
+      const req = item as any;
       sheet.addRow({
         _id: req._id ? req._id.toString() : '',
         title: req.title,
@@ -466,22 +528,16 @@ export class RequestsService {
       });
     });
 
-    // Style đơn giản cho header
     sheet.getRow(1).font = { bold: true };
-    
     return workbook;
   }
 
-  // ======================================================
-  // [MỚI] CHỨC NĂNG SLA MONITORING (CRON JOB)
-  // ======================================================
   @Cron(CronExpression.EVERY_10_MINUTES)
   async checkSlaBreach() {
     this.logger.log('🔄 Đang quét SLA...');
     const now = new Date();
     
-    // Tìm ticket chưa xong & quá hạn & chưa đánh dấu
-    const overdueRequests = await this.model.find({
+    const overdueRequests = await this.requestModel.find({
       status: { $nin: ['COMPLETED', 'CANCELLED', 'REJECTED'] }, 
       dueDate: { $lt: now },
       'custom.isSlaBreached': { $ne: true }

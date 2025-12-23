@@ -9,13 +9,14 @@ import ProfilePage from './pages/ProfilePage';
 import RequestNewPage from './pages/NewRequestPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import AdminUsersListPage from './pages/AdminUsersListPage';
-import AdminUsersPage from './pages/AdminUsersPage';
+import AdminUsersPage from './pages/AdminUsersPage'; // Trang tạo user
+import UserDetailPage from './pages/UserDetailPage'; // <--- [MỚI] Import trang chi tiết
 import RequireRoles from './routes/RequireRoles';
 import RequestsQueuePage from './pages/RequestsQueuePage';
 import RequestsToApprove from './pages/RequestsToApprove';
 import RequestDetail from './pages/RequestDetail';
 import Chatbot from './components/Chatbot';
-import Dashboard from './pages/Dashboard'; // <--- 1. IMPORT DASHBOARD
+import Dashboard from './pages/Dashboard';
 
 export default function App() {
   const { token, user, logout } = useAuth();
@@ -63,7 +64,6 @@ export default function App() {
               <Route path="/requests/pending" element={<RequestsToApprove />} />
               <Route path="/requests/:id" element={<RequestDetail />} />
               
-              {/* --- 2. THÊM ROUTE DASHBOARD --- */}
               <Route 
                 path="/dashboard" 
                 element={
@@ -76,8 +76,13 @@ export default function App() {
               <Route path="/queue/hr" element={<RequireRoles anyOf={['ADMIN', 'HR_MANAGER']}><RequestsQueuePage category="HR" /></RequireRoles>} />
               <Route path="/queue/it" element={<RequireRoles anyOf={['ADMIN', 'IT_MANAGER']}><RequestsQueuePage category="IT" /></RequireRoles>} />
             </Route>
+
+            {/* --- ADMIN ROUTES --- */}
             <Route path="/admin/users" element={<RequireAdmin><AdminUsersListPage /></RequireAdmin>} />
             <Route path="/admin/users/create" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
+            {/* [MỚI] Route xem chi tiết & phân quyền Manager */}
+            <Route path="/admin/users/:id" element={<RequireAdmin><UserDetailPage /></RequireAdmin>} />
+
             <Route path="/" element={<Navigate to="/profile" replace />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>

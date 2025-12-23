@@ -25,19 +25,29 @@ export class CreateUserDto {
   @MinLength(6)
   password!: string;
 
+  // [ĐÃ CÓ] Trường phòng ban
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
+  department?: string;
+
+  // [MỚI] Thêm trường số điện thoại
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  phoneNumber?: string;
+
   @IsOptional()
   @IsArray()
-  // chấp nhận cả 'user'/'USER'... và map về enum:
+  // Logic map roles giữ nguyên
   @Transform(({ value }) => {
     if (!value) return undefined;
     const arr = Array.isArray(value) ? value : String(value).split(',');
     return arr
       .map((v: string) => String(v).trim())
       .map((v: string) => {
-        const upper = v.toUpperCase(); // "user" -> "USER"
-        // khớp theo key enum
+        const upper = v.toUpperCase();
         if ((Role as any)[upper]) return (Role as any)[upper] as Role;
-        // khớp theo value enum (phòng khi FE gửi đúng value)
         const byValue = (Object.values(Role) as string[]).find(
           (val) => val.toUpperCase() === upper,
         );

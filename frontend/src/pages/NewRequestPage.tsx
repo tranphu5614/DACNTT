@@ -14,7 +14,7 @@ import RequestDynamicFields from '../components/RequestDynamicFields';
 
 type SelectOption = StaticSelectOption;
 
-// Định nghĩa Type rõ ràng cho state form
+// [CẬP NHẬT] Xóa trường description khỏi State
 type FormState = {
   category: 'HR' | 'IT';
   typeKey: string;
@@ -34,7 +34,6 @@ export default function NewRequestPage() {
     custom: {},
   });
 
-  // State lưu options cho dynamic select (bao gồm cả danh sách phòng)
   const [remoteOptions, setRemoteOptions] = useState<Record<string, SelectOption[]>>({});
   const [loadingRemote, setLoadingRemote] = useState<Record<string, boolean>>({});
   
@@ -47,7 +46,7 @@ export default function NewRequestPage() {
     setToken(localStorage.getItem('token') || '');
   }, []);
 
-  // Hàm thay thế biến trong URL template (ví dụ: {custom.size})
+  // Hàm thay thế biến trong URL template
   function buildUrlFromTemplate(tpl: string): string {
     return tpl.replace(/\{([^}]+)\}/g, (_m, expr: string) => {
       try {
@@ -62,7 +61,7 @@ export default function NewRequestPage() {
     });
   }
 
-  // Helper convert sang ISO string
+  // Convert sang ISO string
   function toISO(v: string): string {
     if (v && v.includes('T')) {
         const [datePart, timePart] = v.split('T');
@@ -76,7 +75,7 @@ export default function NewRequestPage() {
     [catalog, form.typeKey],
   );
 
-  // AI Suggestion (Gợi ý khi nhập tiêu đề)
+  // AI Suggestion
   useEffect(() => {
     if (!token || form.category !== 'IT' || !form.title || form.title.trim().length < 3) {
       setAiSuggestions([]);
@@ -91,7 +90,7 @@ export default function NewRequestPage() {
     return () => clearTimeout(timer);
   }, [token, form.category, form.title]);
 
-  // Load Catalog khi thay đổi Category
+  // Load Catalog
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -107,7 +106,7 @@ export default function NewRequestPage() {
 
         setCatalog(data || []);
 
-        // Nếu typeKey hiện tại không nằm trong catalog mới, reset về item đầu tiên
+        // Reset form nếu typeKey hiện tại không khớp
         if (!data?.find((x) => x.typeKey === form.typeKey)) {
           const first = data?.[0];
           setForm((old) => ({
@@ -129,19 +128,17 @@ export default function NewRequestPage() {
     };
   }, [token, form.category]);
 
-  // Load Dynamic Fields (bao gồm danh sách phòng)
+  // Load Dynamic Fields
   useEffect(() => {
     if (!token || !current) return;
     let cancelled = false;
 
     const fetchField = async (f: CatalogField) => {
-      // Chỉ xử lý các field có optionsUrlTemplate (select hoặc room_selector)
       if ((f.type !== 'select' && f.type !== 'room_selector') || !('optionsUrlTemplate' in f)) return;
       
       const dynField = f as DynamicSelectField | RoomSelectorField;
       const url = buildUrlFromTemplate(dynField.optionsUrlTemplate);
 
-      // Nếu URL chưa đủ tham số (vẫn còn {template}), chưa gọi API
       if (/[^a-zA-Z0-9]\{[^}]+?\}/.test(url)) {
         setRemoteOptions((prev) => ({ ...prev, [f.key]: [] }));
         return;
@@ -149,8 +146,6 @@ export default function NewRequestPage() {
 
       try {
         setLoadingRemote((prev) => ({ ...prev, [f.key]: true }));
-        
-        // Gọi API, response có thể chứa isBusy
         const data = await apiRequest<Array<{ key?: string; name?: string; value?: string; label?: string; isBusy?: boolean }>>(
           url,
           { method: 'GET' },
@@ -161,12 +156,11 @@ export default function NewRequestPage() {
         const mapped: SelectOption[] = (data || []).map((d: any) => ({
           value: String(d.value ?? d.key ?? ''),
           label: String(d.label ?? d.name ?? d.value ?? d.key ?? ''),
-          isBusy: !!d.isBusy, // Map trạng thái bận
+          isBusy: !!d.isBusy,
         }));
 
         setRemoteOptions((prev) => ({ ...prev, [f.key]: mapped }));
 
-        // Nếu giá trị đang chọn không còn trong danh sách mới (hoặc bị bận), reset
         if (form.custom?.[f.key] && !mapped.find((m) => m.value === form.custom[f.key])) {
           setForm((old) => ({ ...old, custom: { ...old.custom, [f.key]: '' } }));
         }
@@ -188,7 +182,6 @@ export default function NewRequestPage() {
     return () => {
       cancelled = true;
     };
-    // Dependencies: Chạy lại khi token, loại form, hoặc dữ liệu nhập thay đổi (để cập nhật URL template)
   }, [token, current, form.typeKey, JSON.stringify(form.custom)]);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -207,7 +200,7 @@ export default function NewRequestPage() {
       let derivedStart = undefined;
       let derivedEnd = undefined;
 
-      // Xử lý đặc biệt cho Đặt phòng họp: Ghép ngày + giờ
+      // Logic ghép giờ đặt phòng
       if (form.typeKey === 'meeting_room_booking') {
           const { bookingDate, fromTime, toTime } = normalizedCustom;
           if (bookingDate && fromTime && toTime) {
@@ -215,7 +208,7 @@ export default function NewRequestPage() {
               derivedEnd = new Date(`${bookingDate}T${toTime}:00`).toISOString();
           }
       } else {
-          // Xử lý chuẩn cho các form khác có datetime/date
+          // Logic chuẩn hóa ngày tháng
           current?.fields.forEach(f => {
             if (f.key in normalizedCustom && (f.type === 'date' || f.type === 'datetime') && normalizedCustom[f.key]) {
                 normalizedCustom[f.key] = toISO(normalizedCustom[f.key]);
@@ -229,12 +222,12 @@ export default function NewRequestPage() {
         category: form.category,
         typeKey: form.typeKey,
         title: form.title || current?.title || '',
-        description: '', 
+        description: '', // [QUAN TRỌNG] Gửi chuỗi rỗng vì đã xóa UI
         priority: '',    
         custom: normalizedCustom,
         bookingStart: derivedStart, 
         bookingEnd: derivedEnd,
-        bookingRoomKey: normalizedCustom.roomKey, // mapping key phòng
+        bookingRoomKey: normalizedCustom.roomKey,
         files,
       });
 
@@ -258,6 +251,7 @@ export default function NewRequestPage() {
         </div>
       )}
 
+      {/* SELECTORS */}
       <div className="row mb-3">
         <div className="col-md-6">
           <label className="form-label">Danh mục</label>
@@ -308,6 +302,7 @@ export default function NewRequestPage() {
 
       {current && (
         <form onSubmit={onSubmit}>
+          {/* TIÊU ĐỀ */}
           <div className="mb-3">
             <label className="form-label">Tiêu đề <span className="text-danger">*</span></label>
             <input
@@ -317,10 +312,6 @@ export default function NewRequestPage() {
               onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
               placeholder={current.title}
             />
-            <div className="form-text">
-              Hệ thống sẽ tự động phân tích mức độ ưu tiên dựa trên tiêu đề bạn nhập.
-            </div>
-
             {aiSuggestions.length > 0 && (
               <div className="alert alert-info mt-2 mb-0 p-2" style={{ fontSize: '0.9rem' }}>
                 <strong>💡 Gợi ý từ AI:</strong>
@@ -335,7 +326,9 @@ export default function NewRequestPage() {
             )}
           </div>
 
-          {/* Render Form Động từ Catalog */}
+          {/* [ĐÃ XÓA] Ô nhập Description */}
+
+          {/* FORM ĐỘNG */}
           <RequestDynamicFields
             fields={current.fields}
             value={form.custom}
@@ -345,6 +338,7 @@ export default function NewRequestPage() {
             loadingRemote={loadingRemote}
           />
 
+          {/* FILE UPLOAD */}
           <div className="mb-3">
             <label className="form-label">Tệp đính kèm</label>
             <input ref={fileInputRef} type="file" multiple className="form-control" />
