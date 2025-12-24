@@ -8,8 +8,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto'; // [MỚI]
+import { MailerService } from '@nestjs-modules/mailer'; // [MỚI]
+import { ConfigService } from '@nestjs/config'; // [MỚI]
+
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto'; // [MỚI] Import DTO
+import { UpdateUserDto } from './dto/update-user.dto';
 import { Role, User, UserDocument } from './schemas/user.schema';
 import { ListUsersQueryDto } from './dto/list-users.query';
 
@@ -17,6 +21,8 @@ import { ListUsersQueryDto } from './dto/list-users.query';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly mailerService: MailerService, // [MỚI]
+    private readonly configService: ConfigService, // [MỚI]
   ) {}
 
   // =================================================================
@@ -27,6 +33,7 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
+  // [CẬP NHẬT] Thêm logic tạo token và gửi mail
   async create(dto: CreateUserDto) {
     const exists = await this.userModel.exists({ email: dto.email });
     if (exists) throw new ConflictException('Email already exists');
@@ -37,6 +44,9 @@ export class UsersService {
       ? dto.roles.map((v: any) => String(v).toUpperCase() as Role)
       : [Role.USER];
 
+    // [MỚI] Tạo token verify ngẫu nhiên
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
     const doc = await this.userModel.create({
       name: dto.name,
       email: dto.email,
@@ -44,9 +54,47 @@ export class UsersService {
       department: dto.department ? dto.department.toUpperCase() : undefined,
       phoneNumber: dto.phoneNumber,
       roles,
+      isVerified: false, // [MỚI] Mặc định chưa active
+      verificationToken, // [MỚI] Lưu token
     });
 
+    // [MỚI] Gửi email xác nhận
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
+    const link = `${frontendUrl}/verify-email?token=${verificationToken}`;
+
+    try {
+      await this.mailerService.sendMail({
+        to: doc.email,
+        subject: '[Hệ thống] Xác nhận đăng ký tài khoản',
+        html: `
+          <h3>Xin chào ${doc.name},</h3>
+          <p>Bạn vừa đăng ký tài khoản. Vui lòng click vào link dưới đây để kích hoạt:</p>
+          <a href="${link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">XÁC NHẬN NGAY</a>
+          <p>Link này chỉ có hiệu lực một lần.</p>
+        `,
+      });
+      console.log(`Verification email sent to ${doc.email}`);
+    } catch (e) {
+      console.error('Error sending verification email:', e);
+      // Không throw lỗi để tránh rollback user nếu chỉ lỗi mail server
+    }
+
     return doc;
+  }
+
+  // [MỚI] Hàm xử lý xác thực khi user click link
+  async verifyUser(token: string) {
+    const user = await this.userModel.findOne({ verificationToken: token });
+    
+    if (!user) {
+      throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã hết hạn.');
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined; // Xóa token đi sau khi dùng
+    await user.save();
+
+    return { message: 'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.' };
   }
 
   async getProfile(id: string) {
@@ -85,10 +133,9 @@ export class UsersService {
   }
 
   // =================================================================
-  // 3. ADMIN METHODS (Quản lý User)
+  // 3. ADMIN METHODS
   // =================================================================
 
-  // [MỚI - QUAN TRỌNG] Hàm Update tổng hợp: Sửa Info + Tự động chỉnh Role
   async update(id: string, dto: UpdateUserDto) {
     if (!Types.ObjectId.isValid(id)) throw new BadRequestException('Invalid ID');
     
@@ -99,29 +146,23 @@ export class UsersService {
     if (dto.name) user.name = dto.name;
     if (dto.phoneNumber !== undefined) user.phoneNumber = dto.phoneNumber;
     
-    // Nếu đổi phòng ban, cập nhật và chuẩn hóa
     if (dto.department) {
       user.department = dto.department.toUpperCase();
     }
 
-    // 2. Xử lý Logic Role Manager (Nếu có gửi field isManager)
+    // 2. Xử lý Logic Role Manager
     if (dto.isManager !== undefined) {
-      const dept = user.department; // Lấy phòng ban (mới hoặc cũ)
+      const dept = user.department; 
       
-      // Lọc bỏ tất cả role quản lý cũ để tránh trùng lặp/sai lệch
-      // Giữ lại ADMIN và USER, xóa MANAGER, IT_MANAGER, HR_MANAGER...
       let roles = user.roles.filter(r => 
         r !== Role.MANAGER && 
-        !r.endsWith('_MANAGER') // Xóa các role kết thúc bằng _MANAGER
+        !r.endsWith('_MANAGER')
       );
 
-      // Nếu được tick làm quản lý
       if (dto.isManager && dept) {
-        roles.push(Role.MANAGER); // Role chung
+        roles.push(Role.MANAGER);
         const specificRole = `${dept}_MANAGER`;
         
-        // Thêm role cụ thể (IT_MANAGER...)
-        // Dùng 'as Role' để ép kiểu
         if (!roles.includes(specificRole as Role)) {
           roles.push(specificRole as Role);
         }
@@ -133,7 +174,6 @@ export class UsersService {
     return user.save();
   }
 
-  // Hàm cũ (Giữ lại để tương thích nếu cần, nhưng hàm update ở trên đã bao gồm logic này)
   async toggleManagerStatus(userId: string, isManager: boolean) {
     return this.update(userId, { isManager });
   }

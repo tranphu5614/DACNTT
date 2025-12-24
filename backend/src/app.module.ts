@@ -1,14 +1,15 @@
-// backend/src/app.module.ts
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ScheduleModule } from '@nestjs/schedule'; // <--- IMPORT
+import { ScheduleModule } from '@nestjs/schedule'; // [QUAN TRỌNG] Đừng quên import này
+import { MailerModule } from '@nestjs-modules/mailer'; 
 
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { RequestsModule } from './requests/requests.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AiModule } from './ai/ai.module';
+import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
 
 @Module({
   imports: [
@@ -20,7 +21,29 @@ import { AiModule } from './ai/ai.module';
       }),
       inject: [ConfigService],
     }),
-    ScheduleModule.forRoot(), // <--- ĐĂNG KÝ MODULE LÊN LỊCH TRÌNH
+    
+    // [QUAN TRỌNG] Module này giúp chạy Cron Job (SLA check)
+    ScheduleModule.forRoot(),
+
+    // Cấu hình gửi Email
+    MailerModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (config: ConfigService) => ({
+        transport: {
+          host: config.get('MAIL_HOST'),
+          secure: false,
+          auth: {
+            user: config.get('MAIL_USER'),
+            pass: config.get('MAIL_PASSWORD'),
+          },
+        },
+        defaults: {
+          from: config.get('MAIL_FROM'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
+
     UsersModule,
     AuthModule,
     RequestsModule,
@@ -28,4 +51,10 @@ import { AiModule } from './ai/ai.module';
     AiModule,
   ],
 })
-export class AppModule {}
+export class AppModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(RateLimitMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}

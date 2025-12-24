@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import RequireAdmin from './routes/RequireAdmin';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import ProfilePage from './pages/ProfilePage';
 import RequestNewPage from './pages/NewRequestPage';
 import MyRequestsPage from './pages/MyRequestsPage';
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </div>

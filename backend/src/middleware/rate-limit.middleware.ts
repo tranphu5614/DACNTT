@@ -3,7 +3,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import rateLimit from 'express-rate-limit';
 
 @Injectable()
-export class AutocompleteRateLimitMiddleware implements NestMiddleware {
+export class RateLimitMiddleware implements NestMiddleware { // [ĐÃ SỬA] Đổi tên thành RateLimitMiddleware
   private limiter = rateLimit({
     windowMs: 3 * 1000, // 3 seconds
     max: 5, // max 5 requests per window per IP

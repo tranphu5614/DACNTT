@@ -10,7 +10,10 @@ import {
   apiUpdateStatus,
   MyRequestItem
 } from '../api/requests';
-import { apiGetStaffsByDept, UserItem } from '../api/users'; // <--- IMPORT MỚI
+import { apiGetStaffsByDept, UserItem } from '../api/users';
+
+// [FIX] Define API Base URL to be used for static file links
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function RequestDetail() {
   const { id } = useParams();
@@ -26,7 +29,7 @@ export default function RequestDetail() {
   const [isInternal, setIsInternal] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState('');
   
-  // [MỚI] State lưu danh sách nhân viên để hiển thị trong dropdown
+  // State for staff list
   const [staffList, setStaffList] = useState<UserItem[]>([]);
 
   useEffect(() => {
@@ -34,7 +37,6 @@ export default function RequestDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, id]);
 
-  // [MỚI] Effect phụ: Khi data ticket load xong, thì load tiếp danh sách nhân viên tương ứng
   useEffect(() => {
     if (token && data?.category) {
       loadStaffs(data.category);
@@ -54,7 +56,6 @@ export default function RequestDetail() {
     }
   };
 
-  // [MỚI] Hàm gọi API lấy nhân viên
   const loadStaffs = async (dept: string) => {
     try {
       const staffs = await apiGetStaffsByDept(token!, dept);
@@ -233,7 +234,8 @@ export default function RequestDetail() {
                   {data.attachments.map((file, idx) => (
                     <a 
                       key={idx} 
-                      href={`http://localhost:3000/uploads/${file.path}`} 
+                      // [FIX] Use dynamic API_BASE_URL instead of hardcoded localhost
+                      href={`${API_BASE_URL}/uploads/${file.path}`} 
                       target="_blank" 
                       className="btn btn-sm btn-outline-primary"
                       rel="noreferrer"
@@ -331,7 +333,6 @@ export default function RequestDetail() {
                 <div className="text-muted small fst-italic mb-2">Chưa phân công</div>
               )}
 
-              {/* [QUAN TRỌNG] Dropdown load từ API theo Category */}
               {isManager && (
                 <div className="mt-3 pt-3 border-top">
                   {canAssign ? (
@@ -362,7 +363,6 @@ export default function RequestDetail() {
             </div>
           </div>
 
-          {/* Lịch sử duyệt */}
           {data.approvals && data.approvals.length > 0 && (
              <div className="card shadow-sm">
                <div className="card-header bg-white fw-bold small">Quy trình duyệt</div>
