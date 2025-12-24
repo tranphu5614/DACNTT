@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # 1. Database MongoDB
   mongodb:
     image: mongo:6.0
     container_name: reqsys_mongo
@@ -11,7 +10,6 @@ services:
     ports:
       - "27017:27017"
 
-  # 2. Backend (NestJS)
   backend:
     build: ./backend
     container_name: reqsys_backend
@@ -23,18 +21,14 @@ services:
       - MONGO_URI=mongodb://mongodb:27017/reqsys
       - JWT_SECRET=supersecret_key_change_this
       - GEMINI_API_KEY=
-      # [QUAN TRỌNG] Biến này giúp backend biết đường dẫn file
       - BACKEND_URL=http://localhost:3000
     ports:
       - "3000:3000"
     env_file:
       - ./backend/.env
-    # [MỚI - QUAN TRỌNG] Map thư mục uploads ra ngoài máy thật
-    # Cấu trúc: ./đường_dẫn_máy_thật : /đường_dẫn_trong_docker
     volumes:
       - ./backend/uploads:/app/uploads
 
-  # 3. Frontend (React)
   frontend:
     build: ./frontend
     container_name: reqsys_frontend

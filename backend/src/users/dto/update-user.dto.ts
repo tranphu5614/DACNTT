@@ -12,6 +12,10 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
+  avatar?: string;
+
+  @IsOptional()
+  @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
   department?: string;
 
