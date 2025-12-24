@@ -5,9 +5,11 @@ export interface User {
   email: string;
   name: string;
   roles: Role[];
-  // createdAt/updatedAt có thể tồn tại từ backend timestamps
+  department?: string;
+  phoneNumber?: string;
   createdAt?: string;
   updatedAt?: string;
+  avatar?: string;
 }
 
 export interface LoginResponse {

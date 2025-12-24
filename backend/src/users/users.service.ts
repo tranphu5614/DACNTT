@@ -146,11 +146,14 @@ export class UsersService {
     if (dto.name) user.name = dto.name;
     if (dto.phoneNumber !== undefined) user.phoneNumber = dto.phoneNumber;
     
+    // [QUAN TRỌNG] Thêm dòng này để lưu Avatar
+    if (dto.avatar) user.avatar = dto.avatar; 
+
     if (dto.department) {
       user.department = dto.department.toUpperCase();
     }
 
-    // 2. Xử lý Logic Role Manager
+    // 2. Xử lý Logic Role Manager (Giữ nguyên logic của bạn)
     if (dto.isManager !== undefined) {
       const dept = user.department; 
       

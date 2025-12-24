@@ -1,4 +1,3 @@
-// frontend/src/api/users.ts
 import { request } from './request';
 
 // 1. Định nghĩa Interface UserItem
@@ -7,8 +6,9 @@ export interface UserItem {
   name: string;
   email: string;
   department?: string;
-  phoneNumber?: string; // [MỚI] Thêm số điện thoại
-  roles: string[]; // Bắt buộc
+  phoneNumber?: string; 
+  avatar?: string; // [MỚI] Thêm trường avatar
+  roles: string[]; 
 }
 
 // Định nghĩa Payload tạo user
@@ -17,16 +17,16 @@ export type CreateUserPayload = {
   email: string;
   password: string;
   department?: string;
-  phoneNumber?: string; // [MỚI] Thêm số điện thoại
+  phoneNumber?: string;
   roles?: string[];
 };
 
-// [MỚI] Định nghĩa Payload cập nhật user (Dùng cho trang chi tiết)
+// Định nghĩa Payload cập nhật user
 export type UpdateUserPayload = {
   name?: string;
   department?: string;
   phoneNumber?: string;
-  isManager?: boolean; // Checkbox quản lý
+  isManager?: boolean;
 };
 
 // =============================================================================
@@ -45,10 +45,22 @@ export function apiCreateUser(token: string, payload: CreateUserPayload) {
 export function apiGetProfile(token: string) { 
   return request<UserItem>('/users/me', { method: 'GET' }, token);
 }
-// Alias để hỗ trợ code cũ
+// Alias
 export const apiMe = apiGetProfile; 
 
-// Lấy danh sách Users (có phân trang & lọc)
+// [MỚI] Upload Avatar
+// Lưu ý: Không set Content-Type header thủ công, để browser tự xử lý FormData boundary
+export function apiUploadAvatar(token: string, file: File) {
+  const fd = new FormData();
+  fd.append('file', file); // 'file' phải khớp với @UseInterceptors(FileInterceptor('file')) ở backend
+
+  return request<{ message: string; avatar: string }>('/users/me/avatar', {
+    method: 'PUT',
+    body: fd,
+  }, token);
+}
+
+// Lấy danh sách Users
 export function apiListUsers(
   token: string,
   params: { page?: number; limit?: number; search?: string; role?: string } = {}
@@ -72,8 +84,7 @@ export function apiListUsers(
   return request<PageResult<UserItem>>(path, { method: 'GET' }, token);
 }
 
-// [MỚI] Cập nhật User (Thông tin + Quyền quản lý)
-// Gọi vào API PATCH /users/:id ở Backend
+// Cập nhật User
 export function apiUpdateUser(token: string, id: string, payload: UpdateUserPayload) {
   return request<UserItem>(`/users/${id}`, {
     method: 'PATCH',
@@ -93,13 +104,11 @@ export function apiDeleteUser(token: string, id: string) {
 // Lấy danh sách nhân viên theo phòng ban
 export function apiGetStaffsByDept(token: string, department: string) {
   if (!token) throw new Error('Missing token');
-  
   const deptParam = department.toUpperCase(); 
-  
   return request<UserItem[]>(`/users/department/${deptParam}`, { method: 'GET' }, token);
 }
 
-// Helper lấy TOÀN BỘ user (Fallback)
+// Helper lấy TOÀN BỘ user
 export async function apiGetAllUsers(token: string) {
   if (!token) return [];
   try {

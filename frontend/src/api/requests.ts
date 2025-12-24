@@ -1,4 +1,3 @@
-// frontend/src/api/requests.ts
 import { request } from './request';
 
 // [UPDATED] Category là string để hỗ trợ mở rộng (Sales, Logistics, Admin...)
@@ -51,6 +50,14 @@ export interface MyRequestItem {
     mimetype: string;
   }>;
   custom?: Record<string, any>;
+
+  // [FIX] Thêm trường history để tránh lỗi TypeScript ở Frontend
+  history?: Array<{
+    action: string;
+    timestamp: string;
+    user?: UserShort;
+    note?: string;
+  }>;
 
   // Quy trình duyệt
   approvalStatus?: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
@@ -227,10 +234,7 @@ export function apiGetDashboardStats(token: string, category?: string) {
 }
 
 export async function apiExportRequests(token: string) {
-  // Lấy URL gốc (ví dụ http://localhost:3000)
   const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-  
-  // SỬA: Xóa "/api" ở đầu đường dẫn để khớp với backend
   const url = `${baseURL}/requests/export/excel`;
 
   const res = await fetch(url, {

@@ -1,42 +1,201 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* frontend/src/App.css */
+:root {
+  --odoo-primary: #008784; /* Odoo Teal */
+  --odoo-primary-dark: #006e6b;
+  --odoo-bg: #f9f9f9; /* Nền xám nhạt */
+  --odoo-border: #dee2e6;
+  --odoo-text: #212529;
+  --odoo-muted: #666666;
+  --odoo-statusbar-bg: #ffffff;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+body {
+  background-color: var(--odoo-bg);
+  color: var(--odoo-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* --- BUTTONS --- */
+.btn-primary {
+  background-color: var(--odoo-primary);
+  border-color: var(--odoo-primary);
+}
+.btn-primary:hover {
+  background-color: var(--odoo-primary-dark);
+  border-color: var(--odoo-primary-dark);
+}
+.btn-outline-primary {
+  color: var(--odoo-primary);
+  border-color: var(--odoo-primary);
+}
+.btn-outline-primary:hover {
+  background-color: var(--odoo-primary);
+  color: #fff;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* --- ODOO FORM VIEW LAYOUT --- */
+.o_control_panel {
+  background-color: #fff;
+  border-bottom: 1px solid var(--odoo-border);
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.card {
-  padding: 2em;
+.o_form_view {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 20px;
+  gap: 20px;
 }
 
-.read-the-docs {
-  color: #888;
+.o_form_sheet_bg {
+  flex: 1;
+  min-width: 600px;
+}
+
+.o_form_sheet {
+  background: white;
+  border: 1px solid #ced4da;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  padding: 24px 32px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* STATUS BAR (PIPELINE) */
+.o_statusbar {
+  background: white;
+  border: 1px solid #ced4da;
+  border-bottom: 0;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.o_statusbar_status {
+  display: flex;
+}
+
+.o_arrow_button {
+  position: relative;
+  padding: 5px 10px 5px 20px;
+  background: #f1f1f1;
+  color: #666;
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%);
+}
+.o_arrow_button.active {
+  background: var(--odoo-primary);
+  color: white;
+}
+.o_arrow_button:first-child {
+  padding-left: 15px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+}
+
+/* CHATTER (Bên phải) */
+.o_chatter {
+  width: 350px;
+  background: white;
+  border-left: 1px solid var(--odoo-border);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 992px) {
+  .o_chatter { width: 100%; border-left: none; border-top: 1px solid var(--odoo-border); }
+}
+
+.o_chatter_header {
+  padding: 10px 15px;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--odoo-border);
+  font-weight: bold;
+  color: var(--odoo-muted);
+}
+
+.o_thread_message {
+  padding: 10px 15px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}
+.o_thread_avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ccc;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+}
+.o_mail_note {
+  background-color: #fff8e1; /* Màu vàng nhạt cho note nội bộ */
+}
+
+/* KANBAN VIEW */
+.o_kanban_view {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 20px;
+}
+.o_kanban_column {
+  min-width: 300px;
+  width: 300px;
+  background-color: #f0f2f5;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  height: max-content;
+}
+.o_kanban_header {
+  padding: 12px;
+  font-weight: bold;
+  border-bottom: 2px solid rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+}
+.o_kanban_record {
+  background: white;
+  margin: 8px;
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.o_kanban_record:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.o_kanban_record.priority-URGENT { border-left-color: #dc3545; }
+.o_kanban_record.priority-HIGH { border-left-color: #ffc107; }
+.o_kanban_record.priority-MEDIUM { border-left-color: #0dcaf0; }
+
+/* UTILS */
+.fw-500 { font-weight: 500; }
+.text-odoo { color: var(--odoo-primary); }
+
+.hover-text-white:hover {
+    color: #fff !important;
+    background-color: rgba(255,255,255,0.1);
+}
+.custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2); 
+    border-radius: 4px;
 }
