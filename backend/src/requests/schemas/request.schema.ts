@@ -1,16 +1,79 @@
-// backend/src/requests/schemas/request.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export type RequestDocument = Request & Document;
 
-@Schema({ timestamps: true })
-export class Request {
+// [QUAN TRỌNG] Export Enum này để Service import được
+export enum RequestStatus {
+  NEW = 'NEW',
+  PENDING = 'PENDING',       // Chờ duyệt
+  IN_PROGRESS = 'IN_PROGRESS', // Đang xử lý
+  APPROVED = 'APPROVED',     // Đã duyệt
+  REJECTED = 'REJECTED',     // Từ chối duyệt
+  COMPLETED = 'COMPLETED',   // Hoàn thành
+  CANCELLED = 'CANCELLED',   // Hủy bỏ
+  IN_REVIEW = 'IN_REVIEW'    // Đang chờ cấp cao hơn duyệt
+}
+
+// --------------------------------------------------------
+// SUB-SCHEMAS
+// --------------------------------------------------------
+
+@Schema()
+export class ApprovalStep {
   @Prop({ required: true })
-  category!: 'HR' | 'IT';
+  level!: number;
 
   @Prop({ required: true })
-  typeKey!: string;
+  role!: string; // VD: 'MANAGER', 'IT_MANAGER'
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  approver?: Types.ObjectId;
+
+  @Prop()
+  approvedAt?: Date;
+
+  @Prop({ enum: ['APPROVED', 'REJECTED'] })
+  decision?: string;
+
+  @Prop()
+  comment?: string;
+}
+const ApprovalStepSchema = SchemaFactory.createForClass(ApprovalStep);
+
+@Schema()
+export class Comment {
+  @Prop({ required: true })
+  content!: string;
+
+  // Service đang populate 'comments.author' -> dùng field author
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  author?: Types.ObjectId; 
+  
+  // Backup: Tương thích ngược nếu code cũ dùng user
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  user?: Types.ObjectId;
+
+  @Prop({ default: Date.now })
+  createdAt!: Date;
+
+  @Prop({ default: false })
+  isInternal!: boolean;
+}
+const CommentSchema = SchemaFactory.createForClass(Comment);
+
+// --------------------------------------------------------
+// MAIN SCHEMA
+// --------------------------------------------------------
+
+@Schema({ timestamps: true })
+export class Request {
+  // --- THÔNG TIN CƠ BẢN ---
+  @Prop({ required: true })
+  category!: string; // IT, HR, GENERAL...
+
+  @Prop({ required: true })
+  typeKey!: string; // laptop_request, leave_request...
 
   @Prop()
   title?: string;
@@ -18,96 +81,80 @@ export class Request {
   @Prop()
   description?: string;
 
-  @Prop()
+  @Prop({ default: 'MEDIUM' })
   priority?: string;
 
-  // TRẠNG THÁI YÊU CẦU
-  @Prop({
-    default: 'NEW',
-    enum: ['NEW', 'PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']
+  // [QUAN TRỌNG] Dùng Enum RequestStatus
+  @Prop({ 
+    type: String, 
+    enum: RequestStatus, 
+    default: RequestStatus.NEW 
   })
-  status!: string;
+  status!: RequestStatus;
 
-  @Prop({ type: Object })
-  custom?: any;
-
-  // Người tạo yêu cầu
+  // --- NGƯỜI DÙNG LIÊN QUAN ---
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   requester!: Types.ObjectId;
 
-  // --- Đặt phòng (nếu có) ---
-  @Prop()
-  bookingRoomKey?: string;
+  // Hỗ trợ cả 2 tên trường để tương thích mọi phiên bản Service
+  // Service mới dùng 'assignedTo', Service cũ dùng 'assignee' -> Khai báo cả 2 để không lỗi
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  assignedTo?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  assignee?: Types.ObjectId;
+
+  // --- ĐẶT PHÒNG (Booking Fields - Root Level) --- 
+  // Đưa ra root để query check trùng lịch nhanh hơn
+  @Prop() bookingRoomKey?: string;
+  @Prop() bookingStart?: Date;
+  @Prop() bookingEnd?: Date;
+
+  // --- TIỆN ÍCH ---
+  @Prop({ type: [CommentSchema], default: [] })
+  comments!: Comment[];
 
   @Prop()
-  bookingStart?: Date;
+  dueDate?: Date;
 
+  // [QUAN TRỌNG] Để fix lỗi 'resolvedAt does not exist'
   @Prop()
-  bookingEnd?: Date;
+  resolvedAt?: Date;
 
-  // --- File đính kèm ---
-  @Prop({
-    type: [
-      {
-        filename: String,
-        path: String,
-        size: Number,
-        mimetype: String,
-      },
-    ],
-    default: [],
-  })
-  attachments?: {
-    filename: string;
-    path: string;
-    size: number;
-    mimetype: string;
-  }[];
+  @Prop({ type: Object })
+  custom?: any; // Form động
 
-  // --- Quy trình duyệt ---
-  @Prop({
-    default: 'NONE',
-  })
-  approvalStatus!: 'NONE' | 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+  @Prop({ type: [Object], default: [] })
+  attachments?: any[]; // File đính kèm
+
+  // --- QUY TRÌNH DUYỆT ---
+  @Prop({ default: 'NONE' })
+  approvalStatus!: string;
 
   @Prop({ type: Number, default: 0 })
   currentApprovalLevel!: number;
 
-  @Prop({
-    type: [
-      {
-        level: Number,
-        role: String,
-        approver: { type: Types.ObjectId, ref: 'User' },
-        approvedAt: Date,
-        decision: String,
-        comment: String,
-      },
-    ],
-    default: [],
-  })
-  approvals!: {
-    level: number;
-    role: string;
-    approver?: Types.ObjectId;
-    approvedAt?: Date;
-    decision?: 'APPROVED' | 'REJECTED';
-    comment?: string;
-  }[];
+  @Prop({ type: [ApprovalStepSchema], default: [] })
+  approvals!: ApprovalStep[];
 
-  // =============== PHẦN MỚI  ===============
-
-  // Gợi ý sửa lỗi do AI phân tích
+  // --- AI & AUTO FIX ---
   @Prop({ type: String })
   aiSuggestion?: string;
 
-  // Kết quả tự sửa lỗi của người dùng
-  @Prop({
-    type: String,
-    enum: ['FIXED', 'NOT_FIXED', null],
-    default: null,
-  })
+  @Prop({ type: String, enum: ['FIXED', 'NOT_FIXED', null], default: null })
   selfFixResult!: 'FIXED' | 'NOT_FIXED' | null;
+
+  // --- LỊCH SỬ (AUDIT LOG) ---
+  @Prop({
+    type: [{
+      action: String,
+      user: { type: Types.ObjectId, ref: 'User' },
+      timestamp: { type: Date, default: Date.now },
+      note: String
+    }],
+    default: []
+  })
+  history!: any[];
 }
 
 export const RequestSchema = SchemaFactory.createForClass(Request);

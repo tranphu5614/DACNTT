@@ -35,14 +35,15 @@ export type RoomSelectorField = CommonFieldProps & {
 export type CatalogField = BaseInputField | StaticSelectField | DynamicSelectField | RoomSelectorField;
 
 export interface CatalogItem {
-  category: 'HR' | 'IT';
+  category: string; // [FIXED] Đổi từ 'HR' | 'IT' sang string để khớp với hệ thống mới
   typeKey: string;
   title: string;
   fields: CatalogField[];
   approvalFlow?: Array<{ level: number; role: string }>;
 }
 
-export function apiGetCatalog(token: string, category?: 'HR' | 'IT') {
+// [FIXED] Tham số category nhận string thay vì enum cứng
+export function apiGetCatalog(token: string, category?: string) {
   if (!token) throw new Error('Missing token');
   const q = new URLSearchParams();
   if (category) q.set('category', category);

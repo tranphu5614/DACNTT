@@ -1,3 +1,5 @@
+// backend/src/catalog/catalog.data.ts
+
 export type StaticSelectOption = { value: string; label: string };
 
 export type StaticSelectField = {
@@ -6,6 +8,7 @@ export type StaticSelectField = {
   type: 'select';
   required?: boolean;
   options: StaticSelectOption[];
+  optionsUrlTemplate?: never; // Đảm bảo không có trường này
 };
 
 export type DynamicSelectField = {
@@ -14,19 +17,31 @@ export type DynamicSelectField = {
   type: 'select';
   required?: boolean;
   optionsUrlTemplate: string;
+  options?: never; // Đảm bảo không có trường này
 };
 
-// Định nghĩa thêm loại field mới cho Catalog Backend
-export type CatalogField =
-  | {
-      key: string;
-      label: string;
-      type: 'text' | 'textarea' | 'date' | 'number' | 'datetime' | 'time' | 'room_selector'; // [UPDATED] Thêm room_selector
-      required?: boolean;
-      optionsUrlTemplate?: string; // Cho room_selector
-    }
-  | StaticSelectField
-  | DynamicSelectField;
+// [UPDATED] Tách riêng type cho Room Selector để code rõ ràng hơn
+export type RoomSelectorField = {
+  key: string;
+  label: string;
+  type: 'room_selector';
+  required?: boolean;
+  optionsUrlTemplate: string; // Bắt buộc có URL để check phòng trống
+};
+
+export type BaseInputField = {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea' | 'date' | 'number' | 'datetime' | 'time';
+  required?: boolean;
+};
+
+// Tổng hợp các loại field
+export type CatalogField = 
+  | BaseInputField 
+  | StaticSelectField 
+  | DynamicSelectField 
+  | RoomSelectorField;
 
 export type ApprovalStep = {
   level: number;
@@ -34,7 +49,8 @@ export type ApprovalStep = {
 };
 
 export type CatalogItem = {
-  category: 'HR' | 'IT';
+  // [UPDATED] Đổi thành string để hỗ trợ mở rộng (Sales, Admin...)
+  category: string; 
   typeKey: string;
   title: string;
   fields: CatalogField[];
@@ -42,7 +58,7 @@ export type CatalogItem = {
 };
 
 export const DEFAULT_CATALOG: CatalogItem[] = [
-  // ... (Giữ nguyên Leave Request, WFH)
+  // 1. HR: Xin nghỉ phép
   {
     category: 'HR',
     typeKey: 'leave_request',
@@ -54,6 +70,8 @@ export const DEFAULT_CATALOG: CatalogItem[] = [
     ],
     approvalFlow: [{ level: 1, role: 'HR_MANAGER' }],
   },
+
+  // 2. HR: Đăng ký WFH
   {
     category: 'HR',
     typeKey: 'wfh_request',
@@ -68,7 +86,7 @@ export const DEFAULT_CATALOG: CatalogItem[] = [
     ],
   },
 
-  // === HR: Đăng ký phòng họp ===
+  // 3. HR: Đăng ký phòng họp (Tính năng nâng cao)
   {
     category: 'HR',
     typeKey: 'meeting_room_booking',
@@ -88,52 +106,56 @@ export const DEFAULT_CATALOG: CatalogItem[] = [
       { key: 'fromTime', label: 'Giờ bắt đầu', type: 'time', required: true },
       { key: 'toTime', label: 'Giờ kết thúc', type: 'time', required: true },
       
-      // [UPDATED] Đổi type sang 'room_selector'
+      // Field đặc biệt: Chọn phòng trống
       {
         key: 'roomKey',
         label: 'Phòng họp',
-        type: 'room_selector', // [NEW]
+        type: 'room_selector',
         required: true,
         optionsUrlTemplate:
           '/requests/available-rooms?date={custom.bookingDate}&from={custom.fromTime}&to={custom.toTime}&size={custom.size}',
       },
     ],
+    // Phòng họp cần Admin duyệt (hoặc có thể để rỗng nếu muốn auto)
     approvalFlow: [{ level: 1, role: 'ADMIN' }],
   },
 
-  // ... (Giữ nguyên IT Support, Software Access)
+  // 4. IT: Hỗ trợ kỹ thuật
   {
     category: 'IT',
     typeKey: 'it_support',
-    title: 'Hỗ trợ IT',
+    title: 'Hỗ trợ IT (Sửa chữa/Cài đặt)',
     fields: [
       {
         key: 'device',
-        label: 'Thiết bị',
+        label: 'Thiết bị gặp lỗi',
         type: 'select',
         options: [
           { value: 'laptop', label: 'Laptop' },
           { value: 'desktop', label: 'Máy bàn' },
           { value: 'monitor', label: 'Màn hình' },
-          { value: 'peripheral', label: 'Thiết bị ngoại vi' },
+          { value: 'printer', label: 'Máy in' },
+          { value: 'network', label: 'Mạng / Wifi' },
         ],
         required: true,
       },
-      { key: 'problem', label: 'Vấn đề', type: 'textarea', required: true },
+      { key: 'problem', label: 'Mô tả vấn đề', type: 'textarea', required: true },
     ],
-    approvalFlow: [],
+    approvalFlow: [], // Không cần duyệt, IT làm luôn
   },
+
+  // 5. IT: Cấp quyền phần mềm
   {
     category: 'IT',
     typeKey: 'software_access',
-    title: 'Cấp quyền phần mềm',
+    title: 'Cấp quyền truy cập hệ thống',
     fields: [
-      { key: 'software', label: 'Tên phần mềm', type: 'text', required: true },
-      { key: 'justification', label: 'Lý do', type: 'textarea' },
+      { key: 'software', label: 'Tên phần mềm / Hệ thống', type: 'text', required: true },
+      { key: 'justification', label: 'Lý do nghiệp vụ', type: 'textarea', required: true },
     ],
     approvalFlow: [
-      { level: 1, role: 'IT_MANAGER' },
-      { level: 2, role: 'ADMIN' },
+      { level: 1, role: 'IT_MANAGER' }, // Manager IT duyệt kỹ thuật
+      { level: 2, role: 'ADMIN' },      // Admin duyệt bảo mật
     ],
   },
 ];

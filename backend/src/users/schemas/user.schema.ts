@@ -4,6 +4,7 @@ import { Document } from 'mongoose';
 export enum Role {
   USER = 'USER',
   ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER', // [MỚI] Role chung cho quản lý
   IT_MANAGER = 'IT_MANAGER',
   HR_MANAGER = 'HR_MANAGER',
 }
@@ -18,6 +19,14 @@ export class User {
 
   @Prop({ required: true })
   password!: string;
+
+  // [MỚI] Lưu tên phòng ban (IT, HR, SALES...)
+  @Prop()
+  department?: string;
+
+  // [MỚI] Số điện thoại
+  @Prop()
+  phoneNumber?: string;
 
   @Prop({ type: [String], enum: Role, default: [Role.USER] })
   roles!: Role[];

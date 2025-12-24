@@ -14,8 +14,9 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // [FIX] Cập nhật lại tiêu đề để đúng với logic chung
   const title = useMemo(
-    () => (category === 'HR' ? 'Hàng chờ Nhân sự' : 'Hàng chờ IT'),
+    () => (category === 'HR' ? 'Hàng chờ Nhân sự' : category === 'IT' ? 'Hàng chờ IT' : `Hàng chờ ${category}`),
     [category],
   );
 
@@ -23,7 +24,7 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
     setLoading(true);
     try {
       const res = await apiQueueRequests(token!, {
-        category,
+        category, // category giờ là string, backend sẽ tự filter
         page,
         limit,
         status,
@@ -69,18 +70,18 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
           />
         </div>
         <div className="col-sm-3 col-6">
-          <label className="form-label">Trạng thái (BE)</label>
+          <label className="form-label">Trạng thái</label>
           <select
             className="form-select"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
             <option value="">Tất cả</option>
-            <option value="OPEN">OPEN</option>
-            <option value="IN_PROGRESS">IN_PROGRESS</option>
-            <option value="RESOLVED">RESOLVED</option>
-            <option value="CLOSED">CLOSED</option>
-            <option value="REJECTED">REJECTED</option>
+            <option value="NEW">Mới (NEW)</option>
+            <option value="PENDING">Chờ xử lý (PENDING)</option>
+            <option value="IN_PROGRESS">Đang xử lý</option>
+            <option value="COMPLETED">Hoàn thành</option>
+            <option value="CANCELLED">Đã hủy</option>
           </select>
         </div>
         <div className="col-sm-3 col-6">
@@ -108,62 +109,57 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
         <table className="table table-hover align-middle">
           <thead className="table-light">
             <tr>
-              <th>Mã</th>
               <th>Tiêu đề</th>
               <th>Loại</th>
               <th>Ưu tiên</th>
-              <th>Trạng thái duyệt</th>
+              <th>Trạng thái</th>
               <th>Người tạo</th>
               <th>Ngày tạo</th>
-              <th></th>
+              <th className="text-end">Hành động</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="text-center">
+                <td colSpan={7} className="text-center py-4 text-muted">
                   Không có dữ liệu
                 </td>
               </tr>
             )}
             {rows.map((r) => (
               <tr key={r._id}>
-                <td className="text-secondary">{r._id}</td>
                 <td>
-                  <Link to={`/requests/${r._id}`}>{r.title || r.typeKey || r._id}</Link>
+                  <Link to={`/requests/${r._id}`} className="fw-semibold text-decoration-none">
+                    {r.title || <span className="fst-italic text-muted">(Không tiêu đề)</span>}
+                  </Link>
+                  <div className="small text-muted" style={{fontSize: '0.75rem'}}>Mã: {r._id}</div>
                 </td>
-                <td>{r.typeKey}</td>
+                <td><span className="badge bg-light text-dark border">{r.typeKey}</span></td>
                 <td>
-                  <span className="badge text-bg-info">{r.priority || '-'}</span>
+                  <span className={`badge ${r.priority === 'URGENT' ? 'bg-danger' : r.priority === 'HIGH' ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
+                    {r.priority || '-'}
+                  </span>
                 </td>
                 <td>
-                  <span
-                    className={
-                      'badge ' +
-                      (r.approvalStatus === 'APPROVED'
-                        ? 'text-bg-success'
-                        : r.approvalStatus === 'REJECTED'
-                        ? 'text-bg-danger'
-                        : 'text-bg-secondary')
-                    }
-                  >
-                    {r.approvalStatus || 'NONE'}
+                  <span className={`badge ${r.status === 'COMPLETED' ? 'bg-success' : 'bg-secondary'}`}>
+                    {r.status}
                   </span>
                 </td>
                 <td className="text-truncate" style={{ maxWidth: 160 }}>
-                  {String(r.requester)}
+                  {/* [FIXED] Hiển thị tên thay vì [object Object] */}
+                  {(r.requester as any)?.name || (r.requester as any)?.email || 'Unknown'}
                 </td>
                 <td>{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</td>
-                <td>
+                <td className="text-end">
                   <Link to={`/requests/${r._id}`} className="btn btn-sm btn-outline-primary">
-                    Xem
+                    Chi tiết
                   </Link>
                 </td>
               </tr>
             ))}
             {loading && (
               <tr>
-                <td colSpan={8}>Đang tải...</td>
+                <td colSpan={7} className="text-center py-3">Đang tải dữ liệu...</td>
               </tr>
             )}
           </tbody>
@@ -171,28 +167,30 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
       </div>
 
       {/* Pagination */}
-      <nav aria-label="pagination">
-        <ul className="pagination">
-          <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
-            <button
-              className="page-link"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              ‹ Prev
-            </button>
-          </li>
-          <li className="page-item disabled">
-            <span className="page-link">
-              Page {page}/{Math.max(1, Math.ceil(total / limit))} — {total} requests
-            </span>
-          </li>
-          <li className={`page-item ${page * limit >= total ? 'disabled' : ''}`}>
-            <button className="page-link" onClick={() => setPage((p) => p + 1)}>
-              Next ›
-            </button>
-          </li>
-        </ul>
-      </nav>
+      {total > limit && (
+        <nav aria-label="pagination" className="d-flex justify-content-end mt-3">
+            <ul className="pagination">
+            <li className={`page-item ${page <= 1 ? 'disabled' : ''}`}>
+                <button
+                className="page-link"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                ‹ Prev
+                </button>
+            </li>
+            <li className="page-item disabled">
+                <span className="page-link">
+                Trang {page}/{Math.max(1, Math.ceil(total / limit))}
+                </span>
+            </li>
+            <li className={`page-item ${page * limit >= total ? 'disabled' : ''}`}>
+                <button className="page-link" onClick={() => setPage((p) => p + 1)}>
+                Next ›
+                </button>
+            </li>
+            </ul>
+        </nav>
+      )}
     </>
   );
 }

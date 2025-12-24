@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom'; // <--- 1. THÊM IMPORT NÀY
 import { apiMyRequests, MyRequestItem } from '../api/requests';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,7 +20,7 @@ export default function MyRequestsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // --- FIX: Thêm state này để buộc reload khi cần ---
+  // State để buộc reload khi cần
   const [refreshKey, setRefreshKey] = useState(0);
 
   const canLoad = useMemo(() => Boolean(token), [token]);
@@ -51,13 +52,12 @@ export default function MyRequestsPage() {
     return () => {
       aborted = true;
     };
-    // Thêm refreshKey vào dependency array để kích hoạt lại useEffect khi nó thay đổi
   }, [canLoad, token, page, limit, refreshKey]);
 
-  // --- FIX: Hàm xử lý nút Tải lại ---
+  // Hàm xử lý nút Tải lại
   const handleReload = () => {
-    setPage(1); // Đưa về trang đầu
-    setRefreshKey((prev) => prev + 1); // Thay đổi key để buộc useEffect chạy lại
+    setPage(1); 
+    setRefreshKey((prev) => prev + 1); 
   };
 
   if (!token) {
@@ -80,7 +80,7 @@ export default function MyRequestsPage() {
           <button
             className="btn btn-outline-secondary btn-sm"
             disabled={loading}
-            onClick={handleReload} // 👈 Sử dụng hàm handleReload mới
+            onClick={handleReload}
             title="Tải lại dữ liệu mới nhất từ server"
           >
             {loading ? 'Đang tải...' : '↻ Tải lại'}
@@ -113,9 +113,14 @@ export default function MyRequestsPage() {
             {rows.map((r) => (
               <tr key={r._id}>
                 <td>
-                  <a href={`/requests/${r._id}`} className="text-decoration-none fw-semibold">
+                  {/* --- 2. ĐÃ SỬA: Thay thẻ <a> bằng <Link> --- */}
+                  <Link 
+                    to={`/requests/${r._id}`} 
+                    className="text-decoration-none fw-semibold"
+                  >
                     {r.title || '(Không tiêu đề)'}
-                  </a>
+                  </Link>
+                  {/* ------------------------------------------- */}
                 </td>
                 <td>{r.category}</td>
                 <td>
