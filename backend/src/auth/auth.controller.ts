@@ -1,7 +1,10 @@
-import { Body, Controller, ForbiddenException, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common'; // Sắp xếp lại import gọn gàng
 import { AuthService } from './auth.service';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { UsersService } from '../users/users.service';
+import { CreateUserDto } from '../users/dto/create-user.dto';
+import { IsEmail, IsString, MinLength } from 'class-validator'; // [FIX] Thêm import validator
 
+// [FIX] Định nghĩa DTO để validate dữ liệu đầu vào
 class LoginDto {
   @IsEmail()
   email!: string;
@@ -13,15 +16,24 @@ class LoginDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post('login')
-  async login(@Body() dto: LoginDto) {
+  async login(@Body() dto: LoginDto) { // [FIX] Dùng LoginDto thay vì any
+    // [FIX] Truyền đúng 2 tham số tách biệt: email và password
     return this.authService.login(dto.email, dto.password);
   }
 
   @Post('register')
-  registerDisabled() {
-    throw new ForbiddenException('Self-registration is disabled');
+  async register(@Body() createUserDto: CreateUserDto) {
+    return this.usersService.create(createUserDto);
+  }
+
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string) {
+    return this.usersService.verifyUser(token);
   }
 }

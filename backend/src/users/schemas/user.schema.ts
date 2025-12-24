@@ -4,7 +4,7 @@ import { Document } from 'mongoose';
 export enum Role {
   USER = 'USER',
   ADMIN = 'ADMIN',
-  MANAGER = 'MANAGER', // [MỚI] Role chung cho quản lý
+  MANAGER = 'MANAGER',
   IT_MANAGER = 'IT_MANAGER',
   HR_MANAGER = 'HR_MANAGER',
 }
@@ -20,16 +20,22 @@ export class User {
   @Prop({ required: true })
   password!: string;
 
-  // [MỚI] Lưu tên phòng ban (IT, HR, SALES...)
   @Prop()
   department?: string;
 
-  // [MỚI] Số điện thoại
   @Prop()
   phoneNumber?: string;
 
   @Prop({ type: [String], enum: Role, default: [Role.USER] })
   roles!: Role[];
+
+  // [MỚI] Trạng thái đã xác thực hay chưa
+  @Prop({ default: false })
+  isVerified!: boolean;
+
+  // [MỚI] Token xác thực (Select false để ẩn đi khi query thông thường)
+  @Prop({ select: false })
+  verificationToken?: string;
 }
 
 export type UserDocument = User & Document;
