@@ -119,3 +119,10 @@ export async function apiGetAllUsers(token: string) {
     return [];
   }
 }
+
+export function apiChangePassword(token: string, payload: { currentPassword: string; newPassword: string }) {
+  return request<{ message: string }>('/users/me/password', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }, token);
+}

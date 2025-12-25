@@ -10,8 +10,8 @@ import ProfilePage from './pages/ProfilePage';
 import RequestNewPage from './pages/NewRequestPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import AdminUsersListPage from './pages/AdminUsersListPage';
-import AdminUsersPage from './pages/AdminUsersPage'; // Trang tạo user
-import UserDetailPage from './pages/UserDetailPage'; // <--- [MỚI] Import trang chi tiết
+import AdminUsersPage from './pages/AdminUsersPage';
+import UserDetailPage from './pages/UserDetailPage';
 import RequireRoles from './routes/RequireRoles';
 import RequestsQueuePage from './pages/RequestsQueuePage';
 import RequestsToApprove from './pages/RequestsToApprove';
@@ -19,9 +19,14 @@ import RequestDetail from './pages/RequestDetail';
 import Chatbot from './components/Chatbot';
 import Dashboard from './pages/Dashboard';
 
+// [MỚI] Import các trang Quên/Đặt lại mật khẩu
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+
 export default function App() {
   const { token, user, logout } = useAuth();
 
+  // [LOGIC MỚI] Nếu chưa đăng nhập, hiển thị các trang Public
   if (!token) {
     return (
       <div className="container py-5">
@@ -32,6 +37,11 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
+              
+              {/* [MỚI] Routes cho chức năng Quên mật khẩu */}
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           </div>
@@ -40,6 +50,7 @@ export default function App() {
     );
   }
 
+  // [LOGIC MỚI] Nếu ĐÃ đăng nhập, hiển thị Layout chính
   return (
     <div className="container-fluid p-0">
       <nav className="navbar navbar-expand bg-body-tertiary border-bottom sticky-top">
@@ -59,6 +70,9 @@ export default function App() {
         </div>
         <div className="col-12 col-lg-10 p-4 bg-light min-vh-100">
           <Routes>
+            {/* [QUAN TRỌNG] Route verify-email ở đây để hỗ trợ trường hợp user click link khi đang login */}
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/requests/new" element={<RequestNewPage />} />
@@ -82,9 +96,9 @@ export default function App() {
             {/* --- ADMIN ROUTES --- */}
             <Route path="/admin/users" element={<RequireAdmin><AdminUsersListPage /></RequireAdmin>} />
             <Route path="/admin/users/create" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
-            {/* [MỚI] Route xem chi tiết & phân quyền Manager */}
             <Route path="/admin/users/:id" element={<RequireAdmin><UserDetailPage /></RequireAdmin>} />
 
+            {/* Redirect mặc định */}
             <Route path="/" element={<Navigate to="/profile" replace />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>

@@ -17,8 +17,9 @@ export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
 
-  @Prop({ required: true })
-  password!: string;
+  // [SỬA] Cho phép password null ban đầu (khi Admin tạo invite)
+  @Prop({ required: false })
+  password?: string;
 
   @Prop()
   department?: string;
@@ -32,13 +33,20 @@ export class User {
   @Prop({ type: [String], enum: Role, default: [Role.USER] })
   roles!: Role[];
 
-  // [MỚI] Trạng thái đã xác thực hay chưa
   @Prop({ default: false })
   isVerified!: boolean;
 
-  // [MỚI] Token xác thực (Select false để ẩn đi khi query thông thường)
   @Prop({ select: false })
   verificationToken?: string;
+
+  // [MỚI] Token reset mật khẩu (Dùng cho chức năng Quên mật khẩu)
+  // select: false để không trả về token này trong các query thông thường
+  @Prop({ select: false })
+  resetPasswordToken?: string;
+
+  // [MỚI] Thời gian hết hạn của token reset
+  @Prop()
+  resetPasswordExpires?: Date;
 }
 
 export type UserDocument = User & Document;

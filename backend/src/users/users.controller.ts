@@ -6,17 +6,17 @@ import {
   Param,
   Post,
   Patch,
-  Put, // [MỚI]
+  Put,
   Query,
   Req,
   UseGuards,
   BadRequestException,
-  UseInterceptors, // [MỚI]
-  UploadedFile,    // [MỚI]
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express'; // [MỚI]
-import { diskStorage } from 'multer'; // [MỚI]
-import { extname } from 'path';       // [MỚI]
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { Request } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -34,6 +34,7 @@ export class UsersController {
   // 1. PUBLIC / BASIC / PROFILE
   // =================================================================
 
+  // Endpoint này có thể dùng cho Admin tạo user (nếu cần public register thì để, không thì xóa)
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
@@ -46,12 +47,29 @@ export class UsersController {
     return this.usersService.findById(userId); 
   }
 
-  // [MỚI] API Upload Avatar cho chính mình
+  // [MỚI] API Đổi mật khẩu cho user đang đăng nhập
+  @UseGuards(JwtAuthGuard)
+  @Put('me/password')
+  async changePassword(@Req() req: Request, @Body() body: any) {
+    const userId = (req.user as any)?.sub || (req.user as any)?._id;
+    
+    if (!body.currentPassword || !body.newPassword) {
+      throw new BadRequestException('Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.');
+    }
+
+    if (body.newPassword.length < 6) {
+      throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự.');
+    }
+
+    return this.usersService.changePassword(userId, body.currentPassword, body.newPassword);
+  }
+
+  // API Upload Avatar cho chính mình
   @UseGuards(JwtAuthGuard)
   @Put('me/avatar')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({
-      destination: './uploads/avatars', // Đảm bảo thư mục này tồn tại
+      destination: './uploads/avatars',
       filename: (req, file, callback) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
         const ext = extname(file.originalname);
@@ -69,11 +87,8 @@ export class UsersController {
     if (!file) throw new BadRequestException('Không có file được upload');
     
     const userId = (req.user as any)?.sub || (req.user as any)?._id;
-    
-    // Lưu đường dẫn tương đối (để frontend ghép với BASE_URL)
     const avatarUrl = `avatars/${file.filename}`; 
 
-    // Gọi service update
     await this.usersService.update(userId, { avatar: avatarUrl } as UpdateUserDto);
 
     return { 
