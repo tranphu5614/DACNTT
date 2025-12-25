@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom'; // [MỚI] Thêm Link
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -55,6 +55,13 @@ export default function LoginPage() {
               minLength={6}
               required
             />
+          </div>
+
+          {/* [MỚI] Link Quên mật khẩu */}
+          <div className="col-12 text-end">
+             <Link to="/forgot-password" style={{ textDecoration: 'none', fontSize: '0.9rem' }}>
+                Quên mật khẩu?
+             </Link>
           </div>
 
           <div className="col-12 d-grid">

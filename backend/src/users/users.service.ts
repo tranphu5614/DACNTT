@@ -4,13 +4,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException, // [MỚI] Thêm exception này
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto'; // [MỚI]
-import { MailerService } from '@nestjs-modules/mailer'; // [MỚI]
-import { ConfigService } from '@nestjs/config'; // [MỚI]
+import * as crypto from 'crypto';
+import { MailerService } from '@nestjs-modules/mailer';
+import { ConfigService } from '@nestjs/config';
 
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -21,8 +22,8 @@ import { ListUsersQueryDto } from './dto/list-users.query';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    private readonly mailerService: MailerService, // [MỚI]
-    private readonly configService: ConfigService, // [MỚI]
+    private readonly mailerService: MailerService,
+    private readonly configService: ConfigService,
   ) {}
 
   // =================================================================
@@ -33,18 +34,20 @@ export class UsersService {
     return this.userModel.findOne({ email }).exec();
   }
 
-  // [CẬP NHẬT] Thêm logic tạo token và gửi mail
+  // Logic tạo user: Random password tạm + Gửi mail link đặt password
   async create(dto: CreateUserDto) {
     const exists = await this.userModel.exists({ email: dto.email });
     if (exists) throw new ConflictException('Email already exists');
 
-    const passwordHash = await bcrypt.hash(dto.password, 10);
+    // 1. Tạo mật khẩu ngẫu nhiên tạm thời
+    const tempPassword = crypto.randomBytes(16).toString('hex');
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     const roles: Role[] = dto.roles 
       ? dto.roles.map((v: any) => String(v).toUpperCase() as Role)
       : [Role.USER];
 
-    // [MỚI] Tạo token verify ngẫu nhiên
+    // 2. Tạo token verify
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
     const doc = await this.userModel.create({
@@ -54,47 +57,54 @@ export class UsersService {
       department: dto.department ? dto.department.toUpperCase() : undefined,
       phoneNumber: dto.phoneNumber,
       roles,
-      isVerified: false, // [MỚI] Mặc định chưa active
-      verificationToken, // [MỚI] Lưu token
+      isVerified: false, 
+      verificationToken, 
     });
 
-    // [MỚI] Gửi email xác nhận
+    // 3. Gửi email mời kích hoạt
     const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
     const link = `${frontendUrl}/verify-email?token=${verificationToken}`;
 
     try {
       await this.mailerService.sendMail({
         to: doc.email,
-        subject: '[Hệ thống] Xác nhận đăng ký tài khoản',
+        subject: '[Hệ thống] Mời kích hoạt tài khoản & Đặt mật khẩu',
         html: `
           <h3>Xin chào ${doc.name},</h3>
-          <p>Bạn vừa đăng ký tài khoản. Vui lòng click vào link dưới đây để kích hoạt:</p>
-          <a href="${link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">XÁC NHẬN NGAY</a>
-          <p>Link này chỉ có hiệu lực một lần.</p>
+          <p>Tài khoản của bạn đã được khởi tạo thành công.</p>
+          <p>Vui lòng nhấn vào nút bên dưới để thiết lập mật khẩu và kích hoạt tài khoản:</p>
+          <a href="${link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">ĐẶT MẬT KHẨU & KÍCH HOẠT</a>
+          <p>Liên kết này chỉ có hiệu lực một lần.</p>
         `,
       });
-      console.log(`Verification email sent to ${doc.email}`);
+      console.log(`Activation email sent to ${doc.email}`);
     } catch (e) {
-      console.error('Error sending verification email:', e);
-      // Không throw lỗi để tránh rollback user nếu chỉ lỗi mail server
+      console.error('Error sending activation email:', e);
     }
 
     return doc;
   }
 
-  // [MỚI] Hàm xử lý xác thực khi user click link
-  async verifyUser(token: string) {
+  // Hàm kích hoạt tài khoản kèm theo đặt mật khẩu mới
+  async activateAccount(token: string, newPassword: string) {
     const user = await this.userModel.findOne({ verificationToken: token });
     
     if (!user) {
       throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã hết hạn.');
     }
 
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    user.password = passwordHash;
     user.isVerified = true;
-    user.verificationToken = undefined; // Xóa token đi sau khi dùng
+    user.verificationToken = undefined;
     await user.save();
 
-    return { message: 'Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.' };
+    return { message: 'Tài khoản đã kích hoạt thành công. Bạn có thể đăng nhập ngay.' };
+  }
+
+  async verifyUser(token: string) {
+     return this.activateAccount(token, 'DefaultPass123!');
   }
 
   async getProfile(id: string) {
@@ -102,6 +112,83 @@ export class UsersService {
     const user = await this.userModel.findById(id).select('-password').lean().exec();
     if (!user) throw new NotFoundException('User not found');
     return user;
+  }
+
+  // =================================================================
+  // [MỚI] 1.1 PASSWORD RESET & CHANGE METHODS
+  // =================================================================
+
+  // 1. Quên mật khẩu: Gửi mail chứa token
+  async forgotPassword(email: string) {
+    const user = await this.userModel.findOne({ email });
+    if (!user) throw new NotFoundException('Email không tồn tại trong hệ thống');
+
+    // Tạo token reset
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Lưu vào user (đảm bảo schema đã có 2 trường này)
+    user.resetPasswordToken = token;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 giờ
+    await user.save();
+
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
+    const link = `${frontendUrl}/reset-password?token=${token}`;
+
+    try {
+      await this.mailerService.sendMail({
+        to: user.email,
+        subject: '[Hệ thống] Yêu cầu đặt lại mật khẩu',
+        html: `
+          <h3>Xin chào ${user.name},</h3>
+          <p>Hệ thống nhận được yêu cầu khôi phục mật khẩu cho tài khoản này.</p>
+          <p>Nếu là bạn, hãy click vào link bên dưới để đặt lại mật khẩu:</p>
+          <a href="${link}" style="padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px;">ĐẶT LẠI MẬT KHẨU</a>
+          <p>Link này sẽ hết hạn sau 60 phút.</p>
+          <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
+        `,
+      });
+      console.log(`Reset password email sent to ${email}`);
+    } catch (e) {
+      console.error('Error sending forgot password email:', e);
+    }
+
+    return { message: 'Vui lòng kiểm tra email để đặt lại mật khẩu.' };
+  }
+
+  // 2. Đặt lại mật khẩu (từ link email)
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.userModel.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }, // Kiểm tra còn hạn
+    });
+
+    if (!user) throw new BadRequestException('Token không hợp lệ hoặc đã hết hạn');
+
+    // Cập nhật mật khẩu mới
+    user.password = await bcrypt.hash(newPassword, 10);
+    
+    // Xóa token reset
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    
+    await user.save();
+    return { message: 'Mật khẩu đã được đặt lại thành công.' };
+  }
+
+  // 3. Đổi mật khẩu chủ động (khi đã đăng nhập)
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // Kiểm tra mật khẩu cũ
+    const isMatch = await bcrypt.compare(currentPassword, (user as any).password || '');
+    if (!isMatch) throw new UnauthorizedException('Mật khẩu hiện tại không đúng');
+
+    // Lưu mật khẩu mới
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return { message: 'Đổi mật khẩu thành công' };
   }
 
   // =================================================================
@@ -142,18 +229,15 @@ export class UsersService {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('User not found');
 
-    // 1. Cập nhật thông tin cơ bản
     if (dto.name) user.name = dto.name;
     if (dto.phoneNumber !== undefined) user.phoneNumber = dto.phoneNumber;
     
-    // [QUAN TRỌNG] Thêm dòng này để lưu Avatar
     if (dto.avatar) user.avatar = dto.avatar; 
 
     if (dto.department) {
       user.department = dto.department.toUpperCase();
     }
 
-    // 2. Xử lý Logic Role Manager (Giữ nguyên logic của bạn)
     if (dto.isManager !== undefined) {
       const dept = user.department; 
       

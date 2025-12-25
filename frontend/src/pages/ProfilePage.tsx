@@ -1,21 +1,25 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { apiUploadAvatar } from '../api/users'; // Đảm bảo đã import hàm này
+import { apiUploadAvatar, apiChangePassword } from '../api/users'; 
 
 // Lấy URL Backend để hiển thị ảnh
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function ProfilePage() {
-  const { user, refreshMe, token } = useAuth(); // Lấy thêm refreshMe và token
+  const { user, refreshMe, token } = useAuth();
   const [uploading, setUploading] = useState(false);
+  
+  // State cho đổi mật khẩu
+  const [showChangePass, setShowChangePass] = useState(false);
+  const [passData, setPassData] = useState({ current: '', new: '', confirm: '' });
+  const [passStatus, setPassStatus] = useState<'idle' | 'loading'>('idle');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
 
-  // Helper: Lấy chữ cái đầu (dùng khi chưa có ảnh)
   const getInitials = (name: string) => name ? name.charAt(0).toUpperCase() : 'U';
-
-  // Helper: Xử lý đường dẫn ảnh (nếu là đường dẫn tương đối thì thêm domain backend)
+  
   const getAvatarUrl = (path?: string) => {
       if (!path) return null;
       return path.startsWith('http') ? path : `${API_BASE_URL}/uploads/${path}`;
@@ -28,7 +32,6 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !token) return;
 
-    // Validate đơn giản
     if (!file.type.startsWith('image/')) {
         alert('Vui lòng chọn file hình ảnh (JPG, PNG...)');
         return;
@@ -37,14 +40,44 @@ export default function ProfilePage() {
     setUploading(true);
     try {
       await apiUploadAvatar(token, file);
-      await refreshMe(); // Gọi hàm này để reload thông tin user (hiển thị ảnh mới ngay lập tức)
+      await refreshMe();
       alert('Đã cập nhật ảnh đại diện!');
     } catch (err: any) {
       alert(err.message || 'Lỗi khi upload ảnh');
     } finally {
       setUploading(false);
-      // Reset input để cho phép chọn lại cùng 1 file nếu muốn
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // [ĐÃ SỬA] Xử lý đổi mật khẩu
+  const handleChangePass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return; // Kiểm tra token
+
+    if (passData.new !== passData.confirm) {
+        alert('Mật khẩu xác nhận không khớp!');
+        return;
+    }
+    if (passData.new.length < 6) {
+        alert('Mật khẩu mới phải có ít nhất 6 ký tự.');
+        return;
+    }
+
+    setPassStatus('loading');
+    try {
+        // [SỬA LỖI TẠI ĐÂY]: Truyền thêm token vào tham số đầu tiên
+        await apiChangePassword(token, {
+            currentPassword: passData.current,
+            newPassword: passData.new
+        });
+        alert('Đổi mật khẩu thành công!');
+        setShowChangePass(false);
+        setPassData({ current: '', new: '', confirm: '' });
+    } catch (err: any) {
+        alert(err.response?.data?.message || 'Lỗi đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu cũ.');
+    } finally {
+        setPassStatus('idle');
     }
   };
 
@@ -83,7 +116,7 @@ export default function ProfilePage() {
             <div className="p-4 p-md-5">
                 <div className="d-flex flex-column flex-md-row align-items-center align-items-md-start gap-4 mb-5 border-bottom pb-4">
                     
-                    {/* --- AVATAR AREA (CÓ CHỨC NĂNG CHỈNH SỬA) --- */}
+                    {/* --- AVATAR AREA --- */}
                     <div className="position-relative">
                         <div 
                             className="rounded bg-primary-subtle text-primary d-flex align-items-center justify-content-center border border-primary-subtle shadow-sm overflow-hidden"
@@ -95,8 +128,6 @@ export default function ProfilePage() {
                                 getInitials(user.name)
                             )}
                         </div>
-
-                        {/* Nút Camera (Nằm đè lên góc phải dưới avatar) */}
                         <button 
                             className="btn btn-sm btn-light border position-absolute rounded-circle shadow-sm d-flex align-items-center justify-content-center"
                             style={{width: 32, height: 32, bottom: -5, right: -5, padding: 0}}
@@ -110,15 +141,7 @@ export default function ProfilePage() {
                                 <i className="bi bi-camera-fill text-dark small"></i>
                             )}
                         </button>
-
-                        {/* Hidden File Input */}
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="d-none" 
-                            accept="image/*" 
-                            onChange={handleFileChange} 
-                        />
+                        <input type="file" ref={fileInputRef} className="d-none" accept="image/*" onChange={handleFileChange} />
                     </div>
 
                     {/* Tên & Role */}
@@ -137,7 +160,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
 
-                    {/* ID Badge (Góc phải) */}
+                    {/* ID Badge */}
                     <div className="d-none d-md-block text-end">
                         <div className="border rounded px-3 py-2 bg-light">
                             <small className="text-muted d-block text-uppercase" style={{fontSize: '0.65rem'}}>System ID</small>
@@ -191,7 +214,77 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Footer Quote or Extra Info */}
+                {/* --- PHẦN BẢO MẬT & ĐỔI MẬT KHẨU --- */}
+                <div className="mt-5 pt-3">
+                    <h6 className="text-primary text-uppercase border-bottom pb-2 mb-3 fw-bold small">
+                        <i className="bi bi-shield-lock me-2"></i>Bảo mật
+                    </h6>
+                    
+                    {!showChangePass ? (
+                        <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowChangePass(true)}>
+                            <i className="bi bi-key me-2"></i>Đổi mật khẩu
+                        </button>
+                    ) : (
+                        <div className="card bg-light border-0 p-3" style={{maxWidth: 400}}>
+                            <h6 className="card-title fw-bold mb-3">Đổi mật khẩu</h6>
+                            <form onSubmit={handleChangePass}>
+                                <div className="mb-2">
+                                    <label className="form-label small text-muted">Mật khẩu hiện tại</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control form-control-sm"
+                                        required
+                                        value={passData.current}
+                                        onChange={e => setPassData({...passData, current: e.target.value})}
+                                    />
+                                </div>
+                                <div className="mb-2">
+                                    <label className="form-label small text-muted">Mật khẩu mới</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control form-control-sm"
+                                        required
+                                        minLength={6}
+                                        value={passData.new}
+                                        onChange={e => setPassData({...passData, new: e.target.value})}
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label small text-muted">Nhập lại mật khẩu mới</label>
+                                    <input 
+                                        type="password" 
+                                        className="form-control form-control-sm"
+                                        required
+                                        minLength={6}
+                                        value={passData.confirm}
+                                        onChange={e => setPassData({...passData, confirm: e.target.value})}
+                                    />
+                                </div>
+                                <div className="d-flex gap-2">
+                                    <button 
+                                        type="submit" 
+                                        className="btn btn-primary btn-sm"
+                                        disabled={passStatus === 'loading'}
+                                    >
+                                        {passStatus === 'loading' ? 'Đang xử lý...' : 'Lưu thay đổi'}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-outline-secondary btn-sm"
+                                        onClick={() => {
+                                            setShowChangePass(false);
+                                            setPassData({current: '', new: '', confirm: ''});
+                                        }}
+                                        disabled={passStatus === 'loading'}
+                                    >
+                                        Hủy
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+                </div>
+
                 <div className="mt-5 pt-4 text-center text-muted border-top small">
                     <p className="mb-0">Tài khoản được quản lý bởi hệ thống Helpdesk.</p>
                 </div>
