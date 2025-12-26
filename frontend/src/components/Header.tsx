@@ -16,10 +16,10 @@ export default function Header() {
         {user ? (
           <>
             <span>{user.name}</span>
-            <button onClick={logout}>Đăng xuất</button>
+            <button onClick={logout}>Logout</button>
           </>
         ) : (
-          <NavLink to="/login">Đăng nhập</NavLink>
+          <NavLink to="/login">Login</NavLink>
         )}
       </div>
     </header>

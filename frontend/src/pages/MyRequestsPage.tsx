@@ -5,17 +5,17 @@ import { useAuth } from '../context/AuthContext';
 
 type ViewMode = 'list' | 'kanban';
 
-// Helper tính thời gian tương đối
+// Helper to format relative time
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return 'Vừa xong';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
-  return date.toLocaleDateString('vi-VN');
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} mins ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  return date.toLocaleDateString('en-US');
 };
 
 export default function MyRequestsPage() {
@@ -31,15 +31,15 @@ export default function MyRequestsPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(50); 
   const [total, setTotal] = useState(0); 
-  const [filterStatus, setFilterStatus] = useState<string>(''); // Bộ lọc nhanh
+  const [filterStatus, setFilterStatus] = useState<string>(''); // Quick filter
 
   // Kanban Columns
   const kanbanColumns = [
-    { id: 'NEW', title: 'Mới', color: 'border-secondary', bg: 'bg-light' },
-    { id: 'PENDING', title: 'Chờ duyệt', color: 'border-warning', bg: 'bg-warning-subtle' },
-    { id: 'IN_PROGRESS', title: 'Đang xử lý', color: 'border-primary', bg: 'bg-primary-subtle' },
-    { id: 'COMPLETED', title: 'Hoàn thành', color: 'border-success', bg: 'bg-success-subtle' },
-    { id: 'CANCELLED', title: 'Đã hủy', color: 'border-danger', bg: 'bg-danger-subtle' }
+    { id: 'NEW', title: 'New', color: 'border-secondary', bg: 'bg-light' },
+    { id: 'PENDING', title: 'Pending Approval', color: 'border-warning', bg: 'bg-warning-subtle' },
+    { id: 'IN_PROGRESS', title: 'In Progress', color: 'border-primary', bg: 'bg-primary-subtle' },
+    { id: 'COMPLETED', title: 'Completed', color: 'border-success', bg: 'bg-success-subtle' },
+    { id: 'CANCELLED', title: 'Cancelled', color: 'border-danger', bg: 'bg-danger-subtle' }
   ];
 
   const load = async () => {
@@ -58,17 +58,17 @@ export default function MyRequestsPage() {
 
   useEffect(() => { load(); }, [token, page, limit]);
 
-  // Logic lọc Client-side
+  // Client-side filtering logic
   const filteredRows = rows.filter(r => !filterStatus || r.status === filterStatus);
 
   // --- RENDER HELPERS ---
   const PriorityBadge = ({ p }: { p?: string }) => {
     if (!p) return null;
     const map: any = { 
-        'URGENT': { label: 'Khẩn cấp', color: 'danger' },
-        'HIGH': { label: 'Cao', color: 'warning text-dark' },
-        'MEDIUM': { label: 'TB', color: 'info text-dark' },
-        'LOW': { label: 'Thấp', color: 'secondary' }
+        'URGENT': { label: 'Urgent', color: 'danger' },
+        'HIGH': { label: 'High', color: 'warning text-dark' },
+        'MEDIUM': { label: 'Medium', color: 'info text-dark' },
+        'LOW': { label: 'Low', color: 'secondary' }
     };
     const conf = map[p] || map['LOW'];
     return <span className={`badge bg-${conf.color}-subtle text-${conf.color} border border-${conf.color}-subtle ms-1 fw-normal`} style={{fontSize: '0.65rem'}}>{conf.label}</span>;
@@ -77,13 +77,13 @@ export default function MyRequestsPage() {
   const AssigneeAvatar = ({ user }: { user?: any }) => {
       if (!user) return (
         <div className="rounded-circle bg-light text-muted border d-flex align-items-center justify-content-center" 
-             style={{width: 24, height: 24, fontSize: '0.65rem'}} title="Chưa có người xử lý">
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title="No assignee">
             <i className="bi bi-dash"></i>
         </div>
       );
       return (
         <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center border border-white shadow-sm" 
-             style={{width: 24, height: 24, fontSize: '0.65rem'}} title={`Đang xử lý bởi: ${user.name}`}>
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title={`Assigned to: ${user.name}`}>
             {user.name?.[0]?.toUpperCase()}
         </div>
       );
@@ -92,16 +92,16 @@ export default function MyRequestsPage() {
   return (
     <div className="d-flex flex-column h-100 bg-white">
       
-      {/* 1. CONTROL PANEL - Dính liền, Sticky */}
+      {/* 1. CONTROL PANEL - Sticky */}
       <div className="border-bottom px-4 py-2 d-flex justify-content-between align-items-center bg-white sticky-top flex-shrink-0" style={{zIndex: 100, height: 56}}>
         
         {/* Left: Breadcrumb */}
         <div className="d-flex align-items-center gap-3">
-           <h6 className="fw-bold text-dark m-0 text-uppercase">Yêu cầu của tôi</h6>
+           <h6 className="fw-bold text-dark m-0 text-uppercase">My Requests</h6>
            <div className="vr h-50"></div>
            <nav aria-label="breadcrumb">
             <ol className="breadcrumb mb-0 small">
-              <li className="breadcrumb-item active text-muted">Danh sách</li>
+              <li className="breadcrumb-item active text-muted">List</li>
             </ol>
            </nav>
         </div>
@@ -116,13 +116,13 @@ export default function MyRequestsPage() {
                 value={filterStatus} 
                 onChange={(e) => setFilterStatus(e.target.value)}
             >
-                <option value="">Tất cả trạng thái</option>
-                <option value="NEW">Mới tạo</option>
-                <option value="IN_PROGRESS">Đang xử lý</option>
-                <option value="COMPLETED">Hoàn thành</option>
+                <option value="">All Statuses</option>
+                <option value="NEW">New</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
             </select>
 
-            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={load} title="Tải lại" style={{width: 32, height: 32}}>
+            <button className="btn btn-sm btn-light border-0 rounded-circle" onClick={load} title="Reload" style={{width: 32, height: 32}}>
                <i className={`bi bi-arrow-clockwise ${loading ? 'spin' : ''}`}></i>
             </button>
 
@@ -144,7 +144,7 @@ export default function MyRequestsPage() {
             </div>
             
             <Link to="/requests/new" className="btn btn-sm btn-primary fw-bold ms-2 shadow-sm" style={{backgroundColor: '#008784', borderColor: '#008784'}}>
-                <i className="bi bi-plus-lg me-1"></i> Tạo mới
+                <i className="bi bi-plus-lg me-1"></i> Create New
             </Link>
         </div>
       </div>
@@ -163,7 +163,7 @@ export default function MyRequestsPage() {
            <div className="h-100 d-flex gap-3 overflow-x-auto px-3 py-3 bg-white">
              {kanbanColumns.map(col => {
                 const colItems = filteredRows.filter(r => r.status === col.id);
-                // Ẩn cột Huỷ nếu ko có item nào để đỡ rối
+                // Hide Cancelled column if empty to reduce clutter
                 if (col.id === 'CANCELLED' && colItems.length === 0) return null;
 
                 return (
@@ -193,7 +193,7 @@ export default function MyRequestsPage() {
                               style={{ borderLeft: item.priority === 'URGENT' ? '3px solid #dc3545' : '1px solid rgba(0,0,0,0.125)' }}
                            >
                              <div className="card-body p-3">
-                                 <div className="fw-bold text-dark mb-1 text-truncate" style={{fontSize: '0.9rem'}}>{item.title || '(Không tiêu đề)'}</div>
+                                 <div className="fw-bold text-dark mb-1 text-truncate" style={{fontSize: '0.9rem'}}>{item.title || '(No Title)'}</div>
                                  
                                  <div className="d-flex justify-content-between align-items-end mt-2">
                                      <div>
@@ -212,7 +212,7 @@ export default function MyRequestsPage() {
                         ))}
                         {colItems.length === 0 && (
                             <div className="text-center py-5 border rounded bg-light border-dashed">
-                                <span className="text-muted small opacity-50">Trống</span>
+                                <span className="text-muted small opacity-50">Empty</span>
                             </div>
                         )}
                       </div>
@@ -228,10 +228,10 @@ export default function MyRequestsPage() {
                 <table className="table table-hover mb-0 align-middle text-nowrap w-100 border-top">
                     <thead className="bg-light sticky-top" style={{top: 0, zIndex: 5}}>
                         <tr>
-                            <th className="ps-4 small text-muted text-uppercase fw-bold py-2" style={{width: '40%'}}>Tiêu đề</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2">Trạng thái</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2">Người xử lý</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2 text-end pe-4">Cập nhật</th>
+                            <th className="ps-4 small text-muted text-uppercase fw-bold py-2" style={{width: '40%'}}>Title</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Status</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Assignee</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2 text-end pe-4">Updated</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -241,7 +241,7 @@ export default function MyRequestsPage() {
                                     <div className="d-flex align-items-center">
                                         <div className={`rounded-circle me-2`} style={{width: 8, height: 8, backgroundColor: r.priority === 'URGENT' ? '#dc3545' : r.priority === 'HIGH' ? '#ffc107' : '#ced4da'}}></div>
                                         <div>
-                                            <div className="fw-500 text-dark" style={{fontSize: '0.9rem'}}>{r.title || '(Không tiêu đề)'}</div>
+                                            <div className="fw-500 text-dark" style={{fontSize: '0.9rem'}}>{r.title || '(No Title)'}</div>
                                             <div className="text-muted small" style={{fontSize: '0.75rem'}}>
                                                 {r.typeKey} <span className="fst-italic text-secondary ms-1">#{r._id.slice(-6)}</span>
                                             </div>
@@ -263,7 +263,7 @@ export default function MyRequestsPage() {
                             </tr>
                         ))}
                         {filteredRows.length === 0 && (
-                            <tr><td colSpan={4} className="text-center py-5 text-muted small">Không tìm thấy yêu cầu nào</td></tr>
+                            <tr><td colSpan={4} className="text-center py-5 text-muted small">No requests found</td></tr>
                         )}
                     </tbody>
                 </table>
@@ -271,7 +271,7 @@ export default function MyRequestsPage() {
                 {/* Footer Pagination (List View Only) */}
                 <div className="border-top px-4 py-2 bg-light d-flex justify-content-between align-items-center sticky-bottom" style={{bottom: 0}}>
                     <div className="text-muted small">
-                        Tổng số: <strong>{total}</strong> yêu cầu
+                        Total: <strong>{total}</strong> requests
                     </div>
                     <div>
                         <button className="btn btn-sm btn-white border me-1" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>

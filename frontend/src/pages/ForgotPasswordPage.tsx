@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import api from '../utils/api'; // Axios instance của bạn
+import api from '../utils/api'; // Your Axios instance
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -15,31 +15,31 @@ export default function ForgotPasswordPage() {
     try {
       await api.post('/auth/forgot-password', { email });
       setStatus('success');
-      setMessage('Chúng tôi đã gửi link đặt lại mật khẩu vào email của bạn. Vui lòng kiểm tra hộp thư đến (và cả mục Spam).');
+      setMessage('We have sent a password reset link to your email. Please check your inbox (and Spam folder).');
     } catch (err: any) {
       setStatus('error');
-      setMessage(err.response?.data?.message || 'Không tìm thấy email này trong hệ thống.');
+      setMessage(err.response?.data?.message || 'Email not found in the system.');
     }
   };
 
-  // --- UI KHI GỬI THÀNH CÔNG ---
+  // --- UI ON SUCCESS ---
   if (status === 'success') {
     return (
       <div className="o_form_sheet shadow-lg p-5 mx-auto text-center" style={{ maxWidth: '500px', borderRadius: '16px' }}>
         <div className="mb-4 text-success">
            <i className="bi bi-check-circle-fill" style={{ fontSize: '4rem', color: '#008784' }}></i>
         </div>
-        <h3 className="fw-bold text-dark mb-3">Đã Gửi Yêu Cầu!</h3>
+        <h3 className="fw-bold text-dark mb-3">Request Sent!</h3>
         <p className="text-muted mb-4">{message}</p>
         
         <Link to="/login" className="btn btn-primary w-100 py-3 fw-bold text-uppercase shadow-sm" style={{ backgroundColor: '#008784', borderColor: '#008784' }}>
-           <i className="bi bi-arrow-left me-2"></i> Quay lại Đăng nhập
+           <i className="bi bi-arrow-left me-2"></i> Back to Login
         </Link>
       </div>
     );
   }
 
-  // --- UI FORM NHẬP EMAIL ---
+  // --- UI FORM INPUT EMAIL ---
   return (
     <div className="o_form_sheet shadow-lg p-5 mx-auto" style={{ maxWidth: '500px', borderRadius: '16px' }}>
       
@@ -49,9 +49,9 @@ export default function ForgotPasswordPage() {
              style={{ width: '80px', height: '80px' }}>
             <i className="bi bi-shield-lock-fill fs-1" style={{ color: '#008784' }}></i>
         </div>
-        <h3 className="fw-bold text-dark">Quên Mật Khẩu?</h3>
+        <h3 className="fw-bold text-dark">Forgot Password?</h3>
         <p className="text-muted small">
-          Đừng lo, hãy nhập email công ty để nhận hướng dẫn.
+          Don't worry, enter your company email to receive instructions.
         </p>
       </div>
 
@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
       {/* 3. Form */}
       <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
         <div>
-          <label className="form-label fw-bold text-secondary small text-uppercase mb-2">Email Đăng Ký</label>
+          <label className="form-label fw-bold text-secondary small text-uppercase mb-2">Registered Email</label>
           <div className="input-group">
             <span className="input-group-text bg-light border-end-0 text-muted ps-3">
                 <i className="bi bi-envelope fs-5"></i>
@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="nhanvien@company.com"
+              placeholder="employee@company.com"
               style={{ height: '50px', fontSize: '1rem' }}
               autoFocus
               disabled={status === 'loading'}
@@ -94,16 +94,16 @@ export default function ForgotPasswordPage() {
           {status === 'loading' ? (
              <>
                <span className="spinner-border spinner-border-sm me-2"></span>
-               Đang gửi...
+               Sending...
              </>
-          ) : 'Gửi Yêu Cầu'}
+          ) : 'Send Request'}
         </button>
       </form>
 
       {/* 4. Footer Link */}
       <div className="text-center mt-4 pt-3 border-top">
          <Link to="/login" className="text-decoration-none fw-bold d-inline-flex align-items-center" style={{ color: '#008784' }}>
-            <i className="bi bi-arrow-left me-2"></i> Quay lại đăng nhập
+            <i className="bi bi-arrow-left me-2"></i> Back to login
          </Link>
       </div>
 

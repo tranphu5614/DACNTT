@@ -5,17 +5,17 @@ import { apiQueueRequests } from '../api/requests';
 
 type ViewMode = 'list' | 'kanban';
 
-// Helper tính thời gian tương đối
+// Helper to format relative time
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffInSeconds < 60) return 'Vừa xong';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} phút trước`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
-  return date.toLocaleDateString('vi-VN');
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} mins ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  return date.toLocaleDateString('en-US');
 };
 
 export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' }) {
@@ -36,10 +36,10 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   const [limit] = useState(100);
 
   const kanbanColumns = [
-    { id: 'NEW', title: 'Mới', color: 'border-secondary', bg: 'bg-light' },
-    { id: 'PENDING', title: 'Chờ duyệt', color: 'border-warning', bg: 'bg-warning-subtle' },
-    { id: 'IN_PROGRESS', title: 'Đang xử lý', color: 'border-primary', bg: 'bg-primary-subtle' },
-    { id: 'COMPLETED', title: 'Hoàn thành', color: 'border-success', bg: 'bg-success-subtle' }
+    { id: 'NEW', title: 'New', color: 'border-secondary', bg: 'bg-light' },
+    { id: 'PENDING', title: 'Pending Approval', color: 'border-warning', bg: 'bg-warning-subtle' },
+    { id: 'IN_PROGRESS', title: 'In Progress', color: 'border-primary', bg: 'bg-primary-subtle' },
+    { id: 'COMPLETED', title: 'Completed', color: 'border-success', bg: 'bg-success-subtle' }
   ];
 
   const loadData = async () => {
@@ -74,10 +74,10 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   // --- RENDER HELPERS ---
   const PriorityBadge = ({ p }: { p: string }) => {
     const map: any = { 
-        'URGENT': { label: 'Khẩn cấp', color: 'danger' },
-        'HIGH': { label: 'Cao', color: 'warning text-dark' },
-        'MEDIUM': { label: 'TB', color: 'info text-dark' },
-        'LOW': { label: 'Thấp', color: 'secondary' }
+        'URGENT': { label: 'Urgent', color: 'danger' },
+        'HIGH': { label: 'High', color: 'warning text-dark' },
+        'MEDIUM': { label: 'Medium', color: 'info text-dark' },
+        'LOW': { label: 'Low', color: 'secondary' }
     };
     const conf = map[p] || map['LOW'];
     return <span className={`badge bg-${conf.color}-subtle text-${conf.color} border border-${conf.color}-subtle ms-1 fw-normal`} style={{fontSize: '0.65rem'}}>{conf.label}</span>;
@@ -86,13 +86,13 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   const AssigneeAvatar = ({ user }: { user?: any }) => {
       if (!user) return (
         <div className="rounded-circle bg-light text-muted border d-flex align-items-center justify-content-center" 
-             style={{width: 24, height: 24, fontSize: '0.65rem'}} title="Chưa phân công">
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title="Unassigned">
             <i className="bi bi-person"></i>
         </div>
       );
       return (
         <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center border border-white shadow-sm" 
-             style={{width: 24, height: 24, fontSize: '0.65rem'}} title={`Xử lý bởi: ${user.name}`}>
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title={`Assigned to: ${user.name}`}>
             {user.name?.[0]?.toUpperCase()}
         </div>
       );
@@ -101,17 +101,17 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   return (
     <div className="h-100 d-flex flex-column bg-white">
       
-      {/* 1. CONTROL PANEL (Filter Bar) - Dính liền, không shadow, chỉ border nhẹ */}
+      {/* 1. CONTROL PANEL (Filter Bar) - Sticky */}
       <div className="border-bottom px-4 py-2 flex-shrink-0 sticky-top bg-white" style={{zIndex: 100, height: 56}}>
         <div className="d-flex justify-content-between align-items-center h-100">
             
             {/* Left: Breadcrumb + Title */}
             <div className="d-flex align-items-center gap-3">
-               <h6 className="fw-bold text-dark m-0 text-uppercase">{category === 'HR' ? 'Nhân sự' : 'IT Support'}</h6>
+               <h6 className="fw-bold text-dark m-0 text-uppercase">{category === 'HR' ? 'Human Resources' : 'IT Support'}</h6>
                <div className="vr h-50"></div>
                <nav aria-label="breadcrumb">
                 <ol className="breadcrumb mb-0 small">
-                  <li className="breadcrumb-item active text-muted">Hàng chờ xử lý</li>
+                  <li className="breadcrumb-item active text-muted">Request Queue</li>
                 </ol>
                </nav>
             </div>
@@ -120,22 +120,22 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
             <div className="d-flex gap-2 align-items-center">
                 <div className="input-group input-group-sm" style={{ width: 220 }}>
                     <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-search"></i></span>
-                    <input className="form-control bg-light border-0 ps-1" placeholder="Tìm kiếm..." 
+                    <input className="form-control bg-light border-0 ps-1" placeholder="Search..." 
                         value={q} onChange={e => setQ(e.target.value)} onKeyDown={handleSearch} />
                 </div>
 
                 <select className="form-select form-select-sm bg-light border-0" style={{width: 120, cursor: 'pointer'}} 
                     value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-                    <option value="">Mức độ</option>
-                    <option value="URGENT">Khẩn cấp</option>
-                    <option value="HIGH">Cao</option>
-                    <option value="MEDIUM">Trung bình</option>
+                    <option value="">Priority</option>
+                    <option value="URGENT">Urgent</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
                 </select>
 
                 <div className="btn-group btn-group-sm bg-light rounded p-0" role="group">
-                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ALL' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ALL')}>Tất cả</button>
-                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ME' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ME')}>Của tôi</button>
-                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'UNASSIGNED' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('UNASSIGNED')}>Chưa giao</button>
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ALL' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ALL')}>All</button>
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ME' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ME')}>Mine</button>
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'UNASSIGNED' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('UNASSIGNED')}>Unassigned</button>
                 </div>
             </div>
 
@@ -147,7 +147,7 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
                 </div>
                 <div className="vr h-50 mx-1"></div>
                 <button className="btn btn-sm btn-primary fw-bold shadow-sm" onClick={() => navigate('/requests/new')} style={{backgroundColor: '#008784', borderColor: '#008784'}}>
-                    <i className="bi bi-plus-lg me-1"></i> Tạo mới
+                    <i className="bi bi-plus-lg me-1"></i> Create New
                 </button>
             </div>
         </div>
@@ -164,7 +164,7 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
 
         {/* --- KANBAN VIEW --- */}
         {!loading && viewMode === 'kanban' && (
-           <div className="h-100 d-flex overflow-x-auto bg-white px-3 py-3"> {/* Thêm padding nhẹ xung quanh */}
+           <div className="h-100 d-flex overflow-x-auto bg-white px-3 py-3"> 
              {kanbanColumns.map(col => {
                 const colItems = filteredItems.filter(i => i.status === col.id);
                 return (
@@ -188,9 +188,9 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
                            >
                              <div className="card-body p-3">
                                  <div className="d-flex justify-content-between align-items-start mb-2">
-                                     <div className="fw-bold text-dark text-truncate" style={{maxWidth: '85%', fontSize: '0.9rem'}} title={item.title}>{item.title || '(Không tiêu đề)'}</div>
+                                     <div className="fw-bold text-dark text-truncate" style={{maxWidth: '85%', fontSize: '0.9rem'}} title={item.title}>{item.title || '(No Title)'}</div>
                                      {item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'COMPLETED' && (
-                                         <i className="bi bi-circle-fill text-danger" style={{fontSize: '0.5rem'}} title="Quá hạn"></i>
+                                         <i className="bi bi-circle-fill text-danger" style={{fontSize: '0.5rem'}} title="Overdue"></i>
                                      )}
                                  </div>
                                  
@@ -211,7 +211,7 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
                         ))}
                         {colItems.length === 0 && (
                             <div className="text-center py-5 border rounded bg-light border-dashed">
-                                <span className="text-muted small opacity-50">Trống</span>
+                                <span className="text-muted small opacity-50">Empty</span>
                             </div>
                         )}
                       </div>
@@ -227,10 +227,10 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
                 <table className="table table-hover mb-0 align-middle text-nowrap w-100 border-top">
                     <thead className="bg-light sticky-top" style={{top: 0, zIndex: 5}}>
                         <tr>
-                            <th className="ps-4 small text-muted text-uppercase fw-bold py-2" style={{width: '40%'}}>Tiêu đề</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2">Trạng thái</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2">Phân công</th>
-                            <th className="small text-muted text-uppercase fw-bold py-2 text-end pe-4">Cập nhật</th>
+                            <th className="ps-4 small text-muted text-uppercase fw-bold py-2" style={{width: '40%'}}>Title</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Status</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Assignee</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2 text-end pe-4">Updated</th>
                         </tr>
                     </thead>
                     <tbody>

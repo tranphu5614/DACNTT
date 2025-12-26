@@ -59,7 +59,7 @@ export default function RequestDynamicFields({
         const err = errors?.[f.key];
         const common = { id: `field_${f.key}`, name: f.key, disabled, required: f.required };
 
-        // --- [UI MỚI] RENDER ROOM SELECTOR (GRID UI) ---
+        // --- [UI NEW] RENDER ROOM SELECTOR (GRID UI) ---
         if (f.type === 'room_selector') {
             const options: SelectOptions = dynamicOptions[f.key] || [];
             const isLoading = !!loadingRemote[f.key];
@@ -72,13 +72,13 @@ export default function RequestDynamicFields({
                     {isLoading && (
                       <div className="d-flex align-items-center gap-2 text-secondary mb-2">
                         <div className="spinner-border spinner-border-sm" role="status"></div>
-                        <small>Đang tìm phòng trống...</small>
+                        <small>Searching for rooms...</small>
                       </div>
                     )}
                     
                     {!isLoading && options.length === 0 && (
                         <div className="alert alert-light border text-center text-muted py-3 small">
-                           🗓️ Vui lòng nhập <b>Ngày</b> và <b>Giờ</b> để xem danh sách phòng.
+                           🗓️ Please select <b>Date</b> and <b>Time</b> to see available rooms.
                         </div>
                     )}
 
@@ -97,9 +97,9 @@ export default function RequestDynamicFields({
                                 >
                                     <div className="fw-bold">{o.label}</div>
                                     {isBusy ? (
-                                      <div className="room-busy-badge">Đã đặt</div>
+                                      <div className="room-busy-badge">Booked</div>
                                     ) : (
-                                      <div className="small text-success mt-1" style={{fontSize: '0.75rem'}}>Còn trống</div>
+                                      <div className="small text-success mt-1" style={{fontSize: '0.75rem'}}>Available</div>
                                     )}
                                     {isSelected && <div className="room-check-icon">✓</div>}
                                 </button>
@@ -111,7 +111,7 @@ export default function RequestDynamicFields({
             );
         }
 
-        // --- RENDER SELECT (Giữ nguyên nhưng class CSS đã đẹp hơn nhờ index.css) ---
+        // --- RENDER SELECT ---
         if (f.type === 'select') {
           const isDynamic = 'optionsUrlTemplate' in f; 
           const options: SelectOptions = isDynamic 
@@ -129,12 +129,12 @@ export default function RequestDynamicFields({
                 onChange={(e) => setVal(f.key, e.target.value)}
                 disabled={disabled || (isDynamic && (isLoading || options.length === 0))}
               >
-                <option value="">{isDynamic ? (isLoading ? 'Đang tải...' : '-- Chọn --') : '-- Chọn --'}</option>
+                <option value="">{isDynamic ? (isLoading ? 'Loading...' : '-- Select --') : '-- Select --'}</option>
                 {options.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
-              {isDynamic && !isLoading && options.length === 0 && <div className="form-text text-danger">Không có lựa chọn phù hợp.</div>}
+              {isDynamic && !isLoading && options.length === 0 && <div className="form-text text-danger">No matching options found.</div>}
               {err && <div className="invalid-feedback">{err}</div>}
             </div>
           );

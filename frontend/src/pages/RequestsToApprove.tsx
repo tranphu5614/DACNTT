@@ -14,7 +14,7 @@ export default function RequestsToApprove() {
         const data = res.data;
         setItems(Array.isArray(data) ? data : []);
       } catch (e: any) {
-        setError(e?.response?.data?.message || 'Lỗi tải danh sách');
+        setError(e?.response?.data?.message || 'Error loading list');
       } finally {
         setLoading(false);
       }
@@ -26,14 +26,14 @@ export default function RequestsToApprove() {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto' }}>
-      <h2>Yêu cầu chờ tôi duyệt</h2>
-      {items.length === 0 && <p>Không có yêu cầu nào.</p>}
+      <h2>Requests Awaiting My Approval</h2>
+      {items.length === 0 && <p>No requests found.</p>}
       {items.map((r) => (
         <div key={r._id} style={{ border: '1px solid #ddd', padding: 8, marginBottom: 8 }}>
           <div><b>{r.title || r.typeKey}</b></div>
-          <div>Người gửi: {r.requester}</div>
-          <div>Trạng thái duyệt: {r.approvalStatus}</div>
-          <a href={`/requests/${r._id}`}>Xem chi tiết</a>
+          <div>Requester: {r.requester}</div>
+          <div>Approval Status: {r.approvalStatus}</div>
+          <a href={`/requests/${r._id}`}>View Details</a>
         </div>
       ))}
     </div>

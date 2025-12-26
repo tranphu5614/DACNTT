@@ -18,7 +18,7 @@ export default function VerifyEmailPage() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Đường dẫn kích hoạt không hợp lệ hoặc đã hết hạn.');
+      setMessage('Invalid or expired activation link.');
     }
   }, [token]);
 
@@ -27,12 +27,12 @@ export default function VerifyEmailPage() {
 
     if (password.length < 6) {
       setStatus('error');
-      setMessage('Mật khẩu quá ngắn. Vui lòng nhập tối thiểu 6 ký tự.');
+      setMessage('Password too short. Please enter at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
       setStatus('error');
-      setMessage('Mật khẩu xác nhận không trùng khớp.');
+      setMessage('Password confirmation does not match.');
       return;
     }
 
@@ -42,15 +42,15 @@ export default function VerifyEmailPage() {
     try {
       await axios.post('http://localhost:3000/auth/activate', { token, password });
       setStatus('success');
-      setMessage('Tài khoản đã được kích hoạt thành công!');
+      setMessage('Account activated successfully!');
       setTimeout(() => navigate('/login'), 2500);
     } catch (err: any) {
       setStatus('error');
-      setMessage(err.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
+      setMessage(err.response?.data?.message || 'An error occurred. Please try again.');
     }
   };
 
-  // --- UI THÀNH CÔNG (Nhỏ gọn) ---
+  // --- UI SUCCESS (Compact) ---
   if (status === 'success') {
     return (
       <div className="d-flex align-items-center justify-content-center min-vh-100" style={{ backgroundColor: 'var(--odoo-bg)' }}>
@@ -58,7 +58,7 @@ export default function VerifyEmailPage() {
             <div className="mb-3 text-success">
                <i className="bi bi-check-circle-fill" style={{ fontSize: '3.5rem', color: '#008784' }}></i>
             </div>
-            <h4 className="fw-bold text-dark mb-2">Hoàn Tất!</h4>
+            <h4 className="fw-bold text-dark mb-2">Success!</h4>
             <p className="text-muted small mb-3">{message}</p>
             <div className="spinner-border spinner-border-sm text-secondary" role="status"></div>
         </div>
@@ -66,22 +66,22 @@ export default function VerifyEmailPage() {
     );
   }
 
-  // --- UI FORM CHÍNH (Căn giữa & Nhỏ gọn) ---
+  // --- MAIN FORM UI (Centered & Compact) ---
   return (
-    // 1. Container cha: Căn giữa tuyệt đối (dọc + ngang)
+    // 1. Parent Container: Absolute centering (vertical + horizontal)
     <div className="min-vh-100 d-flex align-items-center justify-content-center p-3" style={{ backgroundColor: 'var(--odoo-bg)' }}>
       
-      {/* 2. Card: Giảm maxWidth xuống 420px và padding p-4 */}
+      {/* 2. Card: Reduced maxWidth to 420px and padding p-4 */}
       <div className="o_form_sheet shadow-lg p-4 w-100" style={{ maxWidth: '420px', borderRadius: '12px' }}>
         
-        {/* Header nhỏ gọn hơn */}
+        {/* Compact Header */}
         <div className="text-center mb-4">
           <div className="d-inline-flex align-items-center justify-content-center bg-light rounded-circle mb-3 shadow-sm" 
-               style={{ width: '64px', height: '64px' }}> {/* Icon nhỏ hơn */}
+               style={{ width: '64px', height: '64px' }}> {/* Smaller icon */}
               <i className="bi bi-person-check-fill fs-2" style={{ color: '#008784' }}></i>
           </div>
-          <h4 className="fw-bold text-dark mb-1">Kích Hoạt Tài Khoản</h4>
-          <p className="text-muted small mb-0">Thiết lập mật khẩu để bắt đầu.</p>
+          <h4 className="fw-bold text-dark mb-1">Activate Account</h4>
+          <p className="text-muted small mb-0">Set up your password to get started.</p>
         </div>
 
         {status === 'error' && (
@@ -94,9 +94,9 @@ export default function VerifyEmailPage() {
         {token ? (
           <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
             
-            {/* Mật khẩu mới */}
+            {/* New Password */}
             <div>
-              <label className="form-label fw-bold text-secondary small text-uppercase mb-1" style={{fontSize: '0.75rem'}}>Mật khẩu mới</label>
+              <label className="form-label fw-bold text-secondary small text-uppercase mb-1" style={{fontSize: '0.75rem'}}>New Password</label>
               <div className="input-group">
                   <span className="input-group-text bg-light border-end-0 text-muted ps-3">
                       <i className="bi bi-lock"></i>
@@ -107,8 +107,8 @@ export default function VerifyEmailPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      placeholder="Min 6 ký tự"
-                      style={{ height: '46px', fontSize: '0.95rem' }} // Giảm chiều cao chút
+                      placeholder="Min 6 chars"
+                      style={{ height: '46px', fontSize: '0.95rem' }} // Slightly reduce height
                       disabled={status === 'loading'}
                   />
                   <button 
@@ -121,9 +121,9 @@ export default function VerifyEmailPage() {
               </div>
             </div>
 
-            {/* Xác nhận mật khẩu */}
+            {/* Confirm Password */}
             <div>
-              <label className="form-label fw-bold text-secondary small text-uppercase mb-1" style={{fontSize: '0.75rem'}}>Nhập lại mật khẩu</label>
+              <label className="form-label fw-bold text-secondary small text-uppercase mb-1" style={{fontSize: '0.75rem'}}>Confirm Password</label>
               <div className="input-group">
                   <span className="input-group-text bg-light border-end-0 text-muted ps-3">
                       <i className="bi bi-shield-lock"></i>
@@ -134,7 +134,7 @@ export default function VerifyEmailPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
-                      placeholder="Xác nhận lại"
+                      placeholder="Re-enter password"
                       style={{ height: '46px', fontSize: '0.95rem' }}
                       disabled={status === 'loading'}
                   />
@@ -154,22 +154,22 @@ export default function VerifyEmailPage() {
               disabled={status === 'loading'}
               style={{ backgroundColor: '#008784', borderColor: '#008784', letterSpacing: '0.5px', height: '46px' }}
             >
-              {status === 'loading' ? 'Đang xử lý...' : 'Xác nhận'}
+              {status === 'loading' ? 'Processing...' : 'Confirm'}
             </button>
           </form>
         ) : (
            <div className="text-center">
               <Link to="/login" className="btn btn-outline-primary w-100 py-2 fw-bold" style={{ color: '#008784', borderColor: '#008784' }}>
-                  Quay về trang đăng nhập
+                  Back to Login
               </Link>
            </div>
         )}
 
         {token && (
           <div className="text-center mt-3 pt-3 border-top">
-              <span className="text-muted small" style={{fontSize: '0.85rem'}}>Đã có tài khoản? </span>
+              <span className="text-muted small" style={{fontSize: '0.85rem'}}>Already have an account? </span>
               <Link to="/login" className="fw-bold text-decoration-none ms-1 small" style={{ color: '#008784' }}>
-                  Đăng nhập
+                  Login
               </Link>
           </div>
         )}

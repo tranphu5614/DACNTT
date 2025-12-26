@@ -16,20 +16,20 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Link không hợp lệ hoặc đã hết hạn (thiếu token).');
+      setMessage('Invalid link or link has expired (missing token).');
     }
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setStatus('error'); // Dùng status error để hiện thông báo đẹp hơn alert
-      setMessage('Mật khẩu xác nhận không khớp.');
+      setStatus('error'); // Use error status for prettier notification than alert
+      setMessage('Password confirmation does not match.');
       return;
     }
     if (password.length < 6) {
       setStatus('error');
-      setMessage('Mật khẩu phải có ít nhất 6 ký tự.');
+      setMessage('Password must be at least 6 characters long.');
       return;
     }
 
@@ -40,11 +40,11 @@ export default function ResetPasswordPage() {
       setTimeout(() => navigate('/login'), 3000);
     } catch (err: any) {
       setStatus('error');
-      setMessage(err.response?.data?.message || 'Lỗi đặt lại mật khẩu. Token có thể đã hết hạn.');
+      setMessage(err.response?.data?.message || 'Error resetting password. The token may have expired.');
     }
   };
 
-  // --- TRƯỜNG HỢP THÀNH CÔNG ---
+  // --- SUCCESS CASE ---
   if (status === 'success') {
     return (
       <div className="d-flex flex-column min-vh-100 justify-content-center align-items-center bg-light">
@@ -52,17 +52,17 @@ export default function ResetPasswordPage() {
             <div className="mb-4 text-success">
                 <i className="bi bi-check-circle-fill" style={{fontSize: '4rem'}}></i>
             </div>
-            <h4 className="fw-bold text-dark mb-3">Đổi mật khẩu thành công!</h4>
-            <p className="text-muted mb-4">Mật khẩu của bạn đã được cập nhật. Bạn sẽ được chuyển hướng về trang đăng nhập trong giây lát...</p>
+            <h4 className="fw-bold text-dark mb-3">Password Changed!</h4>
+            <p className="text-muted mb-4">Your password has been updated. You will be redirected to the login page momentarily...</p>
             <Link to="/login" className="btn btn-primary w-100" style={{backgroundColor: '#008784', borderColor: '#008784'}}>
-                Đăng nhập ngay
+                Login Now
             </Link>
         </div>
       </div>
     );
   }
 
-  // --- FORM CHÍNH ---
+  // --- MAIN FORM ---
   return (
     <div className="d-flex flex-column min-vh-100 justify-content-center align-items-center bg-light px-3">
 
@@ -71,8 +71,8 @@ export default function ResetPasswordPage() {
         <div className="card-body p-4 p-md-5">
           
           <div className="text-center mb-4">
-              <h5 className="fw-bold text-dark">Đặt lại mật khẩu</h5>
-              <p className="text-muted small">Vui lòng nhập mật khẩu mới cho tài khoản của bạn.</p>
+              <h5 className="fw-bold text-dark">Reset Password</h5>
+              <p className="text-muted small">Please enter a new password for your account.</p>
           </div>
 
           {status === 'error' && (
@@ -84,15 +84,15 @@ export default function ResetPasswordPage() {
           
           <form onSubmit={handleSubmit}>
             
-            {/* Mật khẩu mới */}
+            {/* New Password */}
             <div className="mb-3">
-              <label className="form-label small fw-bold text-secondary text-uppercase">Mật khẩu mới</label>
+              <label className="form-label small fw-bold text-secondary text-uppercase">New Password</label>
               <div className="input-group">
                   <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-lock"></i></span>
                   <input 
                     type={showPass ? "text" : "password"} 
                     className="form-control border-start-0 border-end-0" 
-                    placeholder="Tối thiểu 6 ký tự"
+                    placeholder="Min 6 chars"
                     required 
                     minLength={6}
                     value={password} 
@@ -108,15 +108,15 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
-            {/* Xác nhận mật khẩu */}
+            {/* Confirm Password */}
             <div className="mb-4">
-              <label className="form-label small fw-bold text-secondary text-uppercase">Xác nhận mật khẩu</label>
+              <label className="form-label small fw-bold text-secondary text-uppercase">Confirm Password</label>
               <div className="input-group">
                   <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-shield-check"></i></span>
                   <input 
                     type={showPass ? "text" : "password"}
                     className="form-control border-start-0" 
-                    placeholder="Nhập lại mật khẩu mới"
+                    placeholder="Re-enter new password"
                     required 
                     value={confirmPassword} 
                     onChange={e => setConfirmPassword(e.target.value)} 
@@ -133,14 +133,14 @@ export default function ResetPasswordPage() {
                 {status === 'loading' ? (
                     <>
                         <span className="spinner-border spinner-border-sm me-2"></span>
-                        Đang xử lý...
+                        Processing...
                     </>
-                ) : 'Đổi mật khẩu'}
+                ) : 'Change Password'}
             </button>
 
             <div className="text-center">
                 <Link to="/login" className="text-decoration-none small text-muted hover-text-primary">
-                    <i className="bi bi-arrow-left me-1"></i> Quay lại đăng nhập
+                    <i className="bi bi-arrow-left me-1"></i> Back to Login
                 </Link>
             </div>
 
