@@ -5,7 +5,7 @@ import { apiQueueRequests } from '../api/requests';
 
 type ViewMode = 'list' | 'kanban';
 
-// Helper tính thời gian tương đối (VD: 2 giờ trước)
+// Helper tính thời gian tương đối
 const formatTimeAgo = (dateString: string) => {
   const date = new Date(dateString);
   const now = new Date();
@@ -29,11 +29,11 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
   const [q, setQ] = useState('');
-  const [filterPriority, setFilterPriority] = useState(''); // Filter bổ sung
-  const [filterAssigned, setFilterAssigned] = useState('ALL'); // ALL | ME | UNASSIGNED
+  const [filterPriority, setFilterPriority] = useState('');
+  const [filterAssigned, setFilterAssigned] = useState('ALL'); 
   
   const [page, setPage] = useState(1);
-  const [limit] = useState(100); // Kanban cần load nhiều
+  const [limit] = useState(100);
 
   const kanbanColumns = [
     { id: 'NEW', title: 'Mới', color: 'border-secondary', bg: 'bg-light' },
@@ -63,7 +63,6 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
     if (e.key === 'Enter') { setPage(1); loadData(); }
   };
 
-  // Logic lọc Client-side cho Assigned (giúp UX mượt hơn)
   const filteredItems = useMemo(() => {
     return items.filter(item => {
         if (filterAssigned === 'ME') return item.assignedTo?._id === user?._id;
@@ -81,134 +80,140 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
         'LOW': { label: 'Thấp', color: 'secondary' }
     };
     const conf = map[p] || map['LOW'];
-    return <span className={`badge bg-${conf.color} border border-${conf.color} ms-1`} style={{fontSize: '0.65rem'}}>{conf.label}</span>;
+    return <span className={`badge bg-${conf.color}-subtle text-${conf.color} border border-${conf.color}-subtle ms-1 fw-normal`} style={{fontSize: '0.65rem'}}>{conf.label}</span>;
   };
 
   const AssigneeAvatar = ({ user }: { user?: any }) => {
       if (!user) return (
-        <div className="rounded-circle bg-white text-muted border d-flex align-items-center justify-content-center" 
-             style={{width: 28, height: 28, fontSize: '0.7rem'}} title="Chưa phân công">
-            <i className="bi bi-person-plus"></i>
+        <div className="rounded-circle bg-light text-muted border d-flex align-items-center justify-content-center" 
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title="Chưa phân công">
+            <i className="bi bi-person"></i>
         </div>
       );
       return (
         <div className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center border border-white shadow-sm" 
-             style={{width: 28, height: 28, fontSize: '0.7rem'}} title={`Xử lý bởi: ${user.name}`}>
+             style={{width: 24, height: 24, fontSize: '0.65rem'}} title={`Xử lý bởi: ${user.name}`}>
             {user.name?.[0]?.toUpperCase()}
         </div>
       );
   };
 
   return (
-    <div className="h-100 d-flex flex-column bg-light">
+    <div className="h-100 d-flex flex-column bg-white">
       
-      {/* 1. CONTROL PANEL (Filter Bar) */}
-      <div className="bg-white border-bottom px-3 py-2 shadow-sm flex-shrink-0">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-            <nav aria-label="breadcrumb">
+      {/* 1. CONTROL PANEL (Filter Bar) - Dính liền, không shadow, chỉ border nhẹ */}
+      <div className="border-bottom px-4 py-2 flex-shrink-0 sticky-top bg-white" style={{zIndex: 100, height: 56}}>
+        <div className="d-flex justify-content-between align-items-center h-100">
+            
+            {/* Left: Breadcrumb + Title */}
+            <div className="d-flex align-items-center gap-3">
+               <h6 className="fw-bold text-dark m-0 text-uppercase">{category === 'HR' ? 'Nhân sự' : 'IT Support'}</h6>
+               <div className="vr h-50"></div>
+               <nav aria-label="breadcrumb">
                 <ol className="breadcrumb mb-0 small">
-                <li className="breadcrumb-item text-uppercase text-muted">Hàng chờ</li>
-                <li className="breadcrumb-item active fw-bold text-primary" aria-current="page">
-                    {category === 'HR' ? 'Nhân sự (HR)' : 'Công nghệ thông tin (IT)'}
-                </li>
+                  <li className="breadcrumb-item active text-muted">Hàng chờ xử lý</li>
                 </ol>
-            </nav>
-            <div className="text-muted small">
-                Tổng: <strong>{filteredItems.length}</strong> yêu cầu
-            </div>
-        </div>
-
-        {/* Toolbar */}
-        <div className="d-flex flex-wrap gap-2 align-items-center">
-            {/* Search */}
-            <div className="input-group input-group-sm" style={{ width: 200 }}>
-                <span className="input-group-text bg-light border-end-0"><i className="bi bi-search"></i></span>
-                <input className="form-control border-start-0 ps-0" placeholder="Tìm kiếm..." 
-                    value={q} onChange={e => setQ(e.target.value)} onKeyDown={handleSearch} />
+               </nav>
             </div>
 
-            {/* Filters */}
-            <select className="form-select form-select-sm" style={{width: 130}} 
-                value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
-                <option value="">-- Mức độ --</option>
-                <option value="URGENT">Khẩn cấp</option>
-                <option value="HIGH">Cao</option>
-                <option value="MEDIUM">Trung bình</option>
-            </select>
+            {/* Center: Search & Filters */}
+            <div className="d-flex gap-2 align-items-center">
+                <div className="input-group input-group-sm" style={{ width: 220 }}>
+                    <span className="input-group-text bg-light border-0 text-muted"><i className="bi bi-search"></i></span>
+                    <input className="form-control bg-light border-0 ps-1" placeholder="Tìm kiếm..." 
+                        value={q} onChange={e => setQ(e.target.value)} onKeyDown={handleSearch} />
+                </div>
 
-            <div className="btn-group btn-group-sm">
-                <button className={`btn ${filterAssigned === 'ALL' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setFilterAssigned('ALL')}>Tất cả</button>
-                <button className={`btn ${filterAssigned === 'ME' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setFilterAssigned('ME')}>Của tôi</button>
-                <button className={`btn ${filterAssigned === 'UNASSIGNED' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setFilterAssigned('UNASSIGNED')}>Chưa giao</button>
+                <select className="form-select form-select-sm bg-light border-0" style={{width: 120, cursor: 'pointer'}} 
+                    value={filterPriority} onChange={e => setFilterPriority(e.target.value)}>
+                    <option value="">Mức độ</option>
+                    <option value="URGENT">Khẩn cấp</option>
+                    <option value="HIGH">Cao</option>
+                    <option value="MEDIUM">Trung bình</option>
+                </select>
+
+                <div className="btn-group btn-group-sm bg-light rounded p-0" role="group">
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ALL' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ALL')}>Tất cả</button>
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'ME' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('ME')}>Của tôi</button>
+                    <button className={`btn btn-sm border-0 rounded ${filterAssigned === 'UNASSIGNED' ? 'bg-white shadow-sm text-primary fw-bold' : 'text-muted'}`} onClick={() => setFilterAssigned('UNASSIGNED')}>Chưa giao</button>
+                </div>
             </div>
 
-            <div className="vr mx-1"></div>
-
-            {/* View Switcher */}
-            <div className="btn-group btn-group-sm ms-auto">
-                <button className={`btn ${viewMode === 'kanban' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setViewMode('kanban')} title="Kanban"><i className="bi bi-kanban"></i></button>
-                <button className={`btn ${viewMode === 'list' ? 'btn-secondary' : 'btn-outline-secondary'}`} onClick={() => setViewMode('list')} title="List"><i className="bi bi-list-ul"></i></button>
+            {/* Right: View & Create */}
+            <div className="d-flex gap-2 align-items-center">
+                <div className="btn-group btn-group-sm bg-light rounded p-0" role="group">
+                    <button className={`btn btn-sm border-0 rounded ${viewMode === 'kanban' ? 'bg-white shadow-sm text-dark' : 'text-muted'}`} onClick={() => setViewMode('kanban')} title="Kanban"><i className="bi bi-kanban"></i></button>
+                    <button className={`btn btn-sm border-0 rounded ${viewMode === 'list' ? 'bg-white shadow-sm text-dark' : 'text-muted'}`} onClick={() => setViewMode('list')} title="List"><i className="bi bi-list-ul"></i></button>
+                </div>
+                <div className="vr h-50 mx-1"></div>
+                <button className="btn btn-sm btn-primary fw-bold shadow-sm" onClick={() => navigate('/requests/new')} style={{backgroundColor: '#008784', borderColor: '#008784'}}>
+                    <i className="bi bi-plus-lg me-1"></i> Tạo mới
+                </button>
             </div>
-            <button className="btn btn-sm btn-primary" onClick={() => navigate('/requests/new')}><i className="bi bi-plus-lg"></i> Tạo mới</button>
         </div>
       </div>
 
-      {/* 2. CONTENT */}
-      <div className="flex-grow-1 p-3 overflow-hidden">
-        {loading && items.length === 0 && <div className="text-center py-5 text-muted">Đang tải dữ liệu...</div>}
+      {/* 2. CONTENT AREA - Full Width & Height */}
+      <div className="flex-grow-1 p-0 overflow-hidden">
+        
+        {loading && items.length === 0 && (
+            <div className="d-flex align-items-center justify-content-center h-100">
+                <div className="spinner-border text-primary" role="status"></div>
+            </div>
+        )}
 
         {/* --- KANBAN VIEW --- */}
         {!loading && viewMode === 'kanban' && (
-           <div className="o_kanban_view h-100 d-flex gap-3 overflow-x-auto pb-2">
+           <div className="h-100 d-flex overflow-x-auto bg-white px-3 py-3"> {/* Thêm padding nhẹ xung quanh */}
              {kanbanColumns.map(col => {
                 const colItems = filteredItems.filter(i => i.status === col.id);
                 return (
-                   <div key={col.id} className="o_kanban_column d-flex flex-column rounded bg-light border shadow-sm" style={{minWidth: 320, width: 320, maxHeight: '100%'}}>
-                      <div className={`p-2 fw-bold text-dark border-bottom d-flex justify-content-between align-items-center bg-white rounded-top border-top-3 ${col.color}`} style={{borderTopWidth: 3}}>
-                          <span className="small text-uppercase fw-bold text-secondary">{col.title}</span>
-                          <span className="badge bg-secondary-subtle text-dark rounded-pill border">{colItems.length}</span>
+                   <div key={col.id} className="d-flex flex-column h-100 me-3" style={{minWidth: 300, width: 300}}>
+                      
+                      {/* Column Header */}
+                      <div className="d-flex justify-content-between align-items-center mb-3 px-1">
+                          <div className="d-flex align-items-center fw-bold text-dark small text-uppercase">
+                              <span className={`badge rounded-pill me-2 border`} style={{width: 10, height: 10, padding: 0, backgroundColor: col.id === 'COMPLETED' ? '#198754' : col.id === 'IN_PROGRESS' ? '#0d6efd' : col.id === 'PENDING' ? '#ffc107' : '#6c757d'}}> </span>
+                              {col.title}
+                          </div>
+                          <span className="text-muted small fw-bold">{colItems.length}</span>
                       </div>
 
-                      <div className="p-2 overflow-y-auto flex-grow-1 custom-scrollbar bg-light">
+                      {/* Column Body (Cards) */}
+                      <div className="flex-grow-1 overflow-y-auto custom-scrollbar pb-3 pe-1">
                         {colItems.map(item => (
-                           <div key={item._id} className="card mb-2 border-0 shadow-sm cursor-pointer o_kanban_card"
-                              onClick={() => navigate(`/requests/${item._id}`)}
-                              style={{ borderLeft: `4px solid ${item.priority === 'URGENT' ? '#dc3545' : item.priority === 'HIGH' ? '#ffc107' : 'transparent'}` }}
+                           <div key={item._id} className="card mb-2 border shadow-sm cursor-pointer hover-shadow transition-all"
+                             onClick={() => navigate(`/requests/${item._id}`)}
+                             style={{ borderLeft: item.priority === 'URGENT' ? '3px solid #dc3545' : '1px solid rgba(0,0,0,0.125)' }}
                            >
-                              <div className="card-body p-2">
-                                  <div className="d-flex justify-content-between mb-1">
-                                      <div className="fw-bold text-truncate text-primary" style={{maxWidth: '80%'}}>{item.title || '(Không tiêu đề)'}</div>
-                                      {/* Icon Deadline nếu gấp */}
-                                      {item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'COMPLETED' && (
-                                          <i className="bi bi-exclamation-circle-fill text-danger" title="Quá hạn"></i>
-                                      )}
-                                  </div>
-                                  
-                                  <div className="d-flex justify-content-between align-items-end mt-2">
+                             <div className="card-body p-3">
+                                 <div className="d-flex justify-content-between align-items-start mb-2">
+                                     <div className="fw-bold text-dark text-truncate" style={{maxWidth: '85%', fontSize: '0.9rem'}} title={item.title}>{item.title || '(Không tiêu đề)'}</div>
+                                     {item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'COMPLETED' && (
+                                         <i className="bi bi-circle-fill text-danger" style={{fontSize: '0.5rem'}} title="Quá hạn"></i>
+                                     )}
+                                 </div>
+                                 
+                                 <div className="d-flex justify-content-between align-items-end">
                                      <div>
-                                        <div className="text-muted small mb-1 d-flex align-items-center">
-                                            <span className="badge bg-light text-secondary border me-1">{item.typeKey}</span>
-                                            {item.priority !== 'LOW' && <PriorityBadge p={item.priority} />}
-                                        </div>
-                                        <div className="text-muted small" style={{fontSize: '0.65rem'}}>
-                                            <i className="bi bi-clock me-1"></i> {formatTimeAgo(item.createdAt)}
-                                        </div>
-                                     </div>
-                                     
-                                     {/* Avatar Group */}
-                                     <div className="d-flex align-items-center">
-                                         {/* Người tạo (nhỏ) */}
-                                         <div className="me-1 opacity-50" title={`Người tạo: ${item.requester?.name}`}>
-                                            <small style={{fontSize: '0.6rem'}}>{item.requester?.name?.split(' ').pop()}</small>
+                                         <div className="d-flex align-items-center gap-1 mb-1">
+                                             <span className="badge bg-light text-muted border fw-normal" style={{fontSize: '0.65rem'}}>{item.typeKey}</span>
+                                             {item.priority !== 'LOW' && <PriorityBadge p={item.priority} />}
                                          </div>
-                                         {/* Người xử lý (lớn) */}
-                                         <AssigneeAvatar user={item.assignedTo} />
+                                         <div className="text-muted small" style={{fontSize: '0.7rem'}}>
+                                             {item.requester?.name?.split(' ').pop()} • {formatTimeAgo(item.createdAt)}
+                                         </div>
                                      </div>
-                                  </div>
-                              </div>
+                                     <AssigneeAvatar user={item.assignedTo} />
+                                 </div>
+                             </div>
                            </div>
                         ))}
-                        {colItems.length === 0 && <div className="text-center text-muted small py-5 opacity-50 fst-italic">Không có yêu cầu</div>}
+                        {colItems.length === 0 && (
+                            <div className="text-center py-5 border rounded bg-light border-dashed">
+                                <span className="text-muted small opacity-50">Trống</span>
+                            </div>
+                        )}
                       </div>
                    </div>
                 )
@@ -218,46 +223,46 @@ export default function RequestsQueuePage({ category }: { category: 'HR' | 'IT' 
 
         {/* --- LIST VIEW --- */}
         {!loading && viewMode === 'list' && (
-            <div className="card shadow-sm border-0 h-100 d-flex flex-column">
-                <div className="table-responsive flex-grow-1">
-                    <table className="table table-hover mb-0 align-middle text-nowrap">
-                        <thead className="bg-light sticky-top" style={{top: 0, zIndex: 5}}>
-                            <tr>
-                                <th className="border-0 text-muted small text-uppercase ps-3">Tiêu đề</th>
-                                <th className="border-0 text-muted small text-uppercase">Loại</th>
-                                <th className="border-0 text-muted small text-uppercase">Trạng thái</th>
-                                <th className="border-0 text-muted small text-uppercase">Người xử lý</th>
-                                <th className="border-0 text-muted small text-uppercase">Cập nhật cuối</th>
+            <div className="h-100 overflow-y-auto">
+                <table className="table table-hover mb-0 align-middle text-nowrap w-100 border-top">
+                    <thead className="bg-light sticky-top" style={{top: 0, zIndex: 5}}>
+                        <tr>
+                            <th className="ps-4 small text-muted text-uppercase fw-bold py-2" style={{width: '40%'}}>Tiêu đề</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Trạng thái</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2">Phân công</th>
+                            <th className="small text-muted text-uppercase fw-bold py-2 text-end pe-4">Cập nhật</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredItems.map(r => (
+                            <tr key={r._id} style={{cursor: 'pointer'}} onClick={() => navigate(`/requests/${r._id}`)}>
+                                <td className="ps-4 py-2">
+                                    <div className="d-flex align-items-center">
+                                        <div className={`rounded-circle me-2`} style={{width: 8, height: 8, backgroundColor: r.priority === 'URGENT' ? '#dc3545' : r.priority === 'HIGH' ? '#ffc107' : '#ced4da'}}></div>
+                                        <div>
+                                            <div className="fw-500 text-dark" style={{fontSize: '0.9rem'}}>{r.title}</div>
+                                            <div className="text-muted small" style={{fontSize: '0.75rem'}}>
+                                                {r.typeKey} • <span className="text-secondary">{r.requester?.name}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="py-2">
+                                    <span className={`badge rounded-pill fw-normal border ${r.status === 'COMPLETED' ? 'bg-success-subtle text-success border-success-subtle' : r.status === 'IN_PROGRESS' ? 'bg-primary-subtle text-primary border-primary-subtle' : 'bg-light text-dark border-secondary-subtle'}`}>
+                                        {r.status}
+                                    </span>
+                                </td>
+                                <td className="py-2">
+                                    <div className="d-flex align-items-center gap-2">
+                                        <AssigneeAvatar user={r.assignedTo} />
+                                        <span className="small text-dark">{r.assignedTo?.name || '-'}</span>
+                                    </div>
+                                </td>
+                                <td className="text-end pe-4 py-2 text-muted small">{formatTimeAgo(r.createdAt)}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {filteredItems.map(r => (
-                                <tr key={r._id} style={{cursor: 'pointer'}} onClick={() => navigate(`/requests/${r._id}`)}>
-                                    <td className="ps-3">
-                                        <div className="fw-500 text-primary">{r.title}</div>
-                                        <div className="small text-muted">
-                                            {r.priority !== 'LOW' && <span className={`text-${r.priority === 'URGENT' ? 'danger' : 'warning'} fw-bold me-1`}>[{r.priority}]</span>}
-                                            Tạo bởi: {r.requester?.name}
-                                        </div>
-                                    </td>
-                                    <td><span className="badge bg-light text-dark border">{r.typeKey}</span></td>
-                                    <td>
-                                        <span className={`badge bg-light text-dark border ${r.status === 'COMPLETED' ? 'text-success border-success' : ''}`}>
-                                            {r.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <AssigneeAvatar user={r.assignedTo} />
-                                            <span className="ms-2 small">{r.assignedTo?.name || <span className="text-muted fst-italic">Chưa giao</span>}</span>
-                                        </div>
-                                    </td>
-                                    <td className="text-muted small">{formatTimeAgo(r.createdAt)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         )}
       </div>

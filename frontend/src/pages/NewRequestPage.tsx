@@ -230,62 +230,60 @@ export default function NewRequestPage() {
   };
 
   return (
-    <div className="d-flex flex-column h-100 bg-light">
+    <div className="d-flex flex-column h-100" style={{ backgroundColor: '#f9f9f9', fontSize: '0.92rem' }}> {/* [STYLE] Giảm font size toàn trang */}
       
-      {/* CONTROL PANEL */}
-      <div className="o_control_panel bg-white border-bottom px-4 py-2 d-flex justify-content-between align-items-center sticky-top shadow-sm" style={{zIndex: 100, height: 60}}>
-        <div className="d-flex align-items-center gap-3">
-            <button className="btn btn-sm btn-outline-secondary" onClick={() => navigate(-1)}>
-                <i className="bi bi-arrow-left"></i> Hủy
-            </button>
-            <div className="vr"></div>
-            <nav aria-label="breadcrumb">
-                <ol className="breadcrumb mb-0">
-                    <li className="breadcrumb-item text-muted">Yêu cầu</li>
-                    <li className="breadcrumb-item active fw-bold text-primary">Tạo mới</li>
-                </ol>
-            </nav>
-        </div>
-        <div>
-            <button className="btn btn-primary px-4 fw-500 shadow-sm" onClick={onSubmit} disabled={loading || !token}>
-                {loading ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-cloud-upload me-2"></i>}
-                Gửi yêu cầu
-            </button>
-        </div>
-      </div>
-
-      {/* MAIN WORKSPACE */}
-      <div className="flex-grow-1 overflow-y-auto p-4 d-flex justify-content-center">
-         <div className="container-fluid" style={{maxWidth: 1200}}>
-            <div className="row g-4">
+      {/* MAIN WORKSPACE - Full Width, Compact Spacing */}
+      <div className="flex-grow-1 overflow-y-auto p-3"> {/* [STYLE] Giảm padding container chính */}
+         
+         <div className="container-fluid p-0">
+            
+            <div className="row g-3"> {/* [STYLE] Giảm khoảng cách Grid */}
                 
                 {/* LEFT: FORM SHEET */}
-                <div className={aiSuggestions.length > 0 ? "col-lg-8" : "col-lg-8 mx-auto"}>
-                    <div className="card border shadow-sm rounded-1">
-                        <div className="card-body p-4 p-md-5">
+                <div className={aiSuggestions.length > 0 ? "col-lg-9" : "col-12"}>
+                    <div className="card border shadow-sm rounded-2 overflow-hidden h-100">
+                        
+                        {/* 1. INTERNAL HEADER - Compact */}
+                        <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
+                            <nav aria-label="breadcrumb">
+                                <ol className="breadcrumb mb-0 small">
+                                    <li className="breadcrumb-item text-muted">Yêu cầu</li>
+                                    <li className="breadcrumb-item active fw-bold" style={{ color: '#008784' }}>Tạo mới</li>
+                                </ol>
+                            </nav>
+                            <button className="btn btn-sm btn-white border text-muted d-flex align-items-center gap-1 shadow-sm" onClick={() => navigate(-1)} style={{fontSize: '0.8rem'}}>
+                                <i className="bi bi-x-lg"></i> Hủy
+                            </button>
+                        </div>
+
+                        <div className="card-body p-3 p-md-4"> {/* [STYLE] Giảm padding Card Body */}
                             
-                            <div className="row mb-4 pb-3 border-bottom">
-                                <div className="col-md-6">
-                                    <label className="text-muted small text-uppercase fw-bold mb-1">Phòng ban / Danh mục</label>
-                                    <div className="btn-group w-100">
-                                        <button 
-                                            className={`btn btn-sm ${form.category === 'HR' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                                            onClick={() => setForm(o => ({...o, category: 'HR', typeKey: '', custom: {}}))}
-                                        >
-                                            <i className="bi bi-people-fill me-2"></i> Nhân sự (HR)
-                                        </button>
-                                        <button 
-                                            className={`btn btn-sm ${form.category === 'IT' ? 'btn-primary' : 'btn-outline-secondary'}`}
-                                            onClick={() => setForm(o => ({...o, category: 'IT', typeKey: '', custom: {}}))}
-                                        >
-                                            <i className="bi bi-pc-display me-2"></i> IT Support
-                                        </button>
+                            {/* 2. Chọn Phòng ban & Loại (Compact Row) */}
+                            <div className="row g-3 mb-3 pb-3 border-bottom">
+                                <div className="col-md-4 col-xl-3">
+                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>PHÒNG BAN</label>
+                                    <div className="btn-group w-100" role="group">
+                                        <input 
+                                            type="radio" className="btn-check" name="btnCategory" id="btnHr" autoComplete="off" 
+                                            checked={form.category === 'HR'} onChange={() => setForm(o => ({...o, category: 'HR', typeKey: '', custom: {}}))}
+                                        />
+                                        <label className={`btn btn-sm ${form.category === 'HR' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnHr"> {/* btn-sm */}
+                                            <i className="bi bi-people-fill me-1"></i> HR
+                                        </label>
+
+                                        <input 
+                                            type="radio" className="btn-check" name="btnCategory" id="btnIt" autoComplete="off"
+                                            checked={form.category === 'IT'} onChange={() => setForm(o => ({...o, category: 'IT', typeKey: '', custom: {}}))}
+                                        />
+                                        <label className={`btn btn-sm ${form.category === 'IT' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnIt"> {/* btn-sm */}
+                                            <i className="bi bi-pc-display me-1"></i> IT
+                                        </label>
                                     </div>
                                 </div>
-                                <div className="col-md-6 mt-3 mt-md-0">
-                                    <label className="text-muted small text-uppercase fw-bold mb-1">Loại yêu cầu</label>
+                                <div className="col-md-8 col-xl-9">
+                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>LOẠI YÊU CẦU</label>
                                     <select
-                                        className="form-select"
+                                        className="form-select form-select-sm bg-light" // form-select-sm
                                         value={form.typeKey}
                                         onChange={(e) => {
                                             const tk = e.target.value;
@@ -294,8 +292,9 @@ export default function NewRequestPage() {
                                             setRemoteOptions({});
                                             setIsSingleDay(false);
                                         }}
+                                        style={{height: '31px'}}
                                     >
-                                        <option value="">-- Chọn loại yêu cầu --</option>
+                                        <option value="">-- Chọn danh mục --</option>
                                         {catalog.map((c) => (
                                             <option key={c.typeKey} value={c.typeKey}>{c.title}</option>
                                         ))}
@@ -303,90 +302,118 @@ export default function NewRequestPage() {
                                 </div>
                             </div>
 
+                            {/* 3. Form Nhập Liệu */}
                             {current ? (
                                 <div className="animate__animated animate__fadeIn">
-                                    <div className="mb-4">
-                                        <label className="form-label h5 text-primary">Tiêu đề yêu cầu</label>
+                                    
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold small text-secondary">Tiêu đề yêu cầu <span className="text-danger">*</span></label>
                                         <input
-                                            className="form-control form-control-lg bg-light"
+                                            className="form-control bg-white border-secondary-subtle fw-semibold" // Bỏ form-control-lg
                                             required
                                             value={form.title}
                                             onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
                                             placeholder={`Ví dụ: ${current.title}...`}
+                                            style={{fontSize: '0.95rem'}}
                                         />
-                                        <div className="form-text">Tiêu đề ngắn gọn giúp chúng tôi hỗ trợ nhanh hơn.</div>
                                     </div>
 
-                                    {/* [CẬP NHẬT UI] Checkbox Single Day đẹp hơn, không bị lệch */}
-                                    {endDateKey && (
-                                        <div className="mb-4 p-3 bg-light rounded border border-start-0 border-end-0 border-top-0 border-bottom-0 border-3 border-primary-subtle">
-                                            <div className="form-check form-switch d-flex align-items-center ps-0">
+                                    {/* Dynamic Fields Container - Compact */}
+                                    <div className="p-3 bg-light rounded-2 border mb-3">
+                                        {endDateKey && (
+                                            <div className="form-check form-switch mb-3 pb-2 border-bottom border-white">
                                                 <input 
-                                                    className="form-check-input ms-0 me-3"
-                                                    type="checkbox" 
-                                                    role="switch"
-                                                    id="singleDayCheck"
+                                                    className="form-check-input" type="checkbox" role="switch" id="singleDayCheck"
                                                     checked={isSingleDay}
                                                     onChange={e => setIsSingleDay(e.target.checked)}
-                                                    style={{width: '2.5em', height: '1.25em', cursor: 'pointer'}}
+                                                    style={{cursor: 'pointer', transform: 'scale(0.8)'}} // Thu nhỏ switch
                                                 />
-                                                <label className="form-check-label user-select-none" htmlFor="singleDayCheck" style={{cursor: 'pointer'}}>
-                                                    <span className="fw-bold text-dark">Chỉ nghỉ 1 ngày</span>
-                                                    <div className="text-muted small">Tự động sao chép Ngày bắt đầu sang Ngày kết thúc</div>
+                                                <label className="form-check-label fw-bold small" htmlFor="singleDayCheck" style={{marginTop: '2px'}}>
+                                                    Chỉ trong 1 ngày
                                                 </label>
                                             </div>
+                                        )}
+
+                                        {/* Lưu ý: Để RequestDynamicFields nhỏ lại, bạn cần đảm bảo component đó dùng class form-control-sm hoặc kế thừa style */}
+                                        <div className="small-form-group">
+                                            <RequestDynamicFields
+                                                fields={visibleFields}
+                                                value={form.custom}
+                                                onChange={(custom) => setForm((old) => ({ ...old, custom }))}
+                                                disabled={loading}
+                                                dynamicOptions={remoteOptions}
+                                                loadingRemote={loadingRemote}
+                                            />
                                         </div>
-                                    )}
-
-                                    <div className="p-3 bg-light rounded border mb-4">
-                                        <RequestDynamicFields
-                                            fields={visibleFields}
-                                            value={form.custom}
-                                            onChange={(custom) => setForm((old) => ({ ...old, custom }))}
-                                            disabled={loading}
-                                            dynamicOptions={remoteOptions}
-                                            loadingRemote={loadingRemote}
-                                        />
                                     </div>
 
-                                    <div>
-                                        <label className="form-label fw-bold small text-uppercase text-muted">
-                                            <i className="bi bi-paperclip me-1"></i> Tệp đính kèm
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold small text-uppercase text-muted mb-1" style={{fontSize: '0.75rem'}}>
+                                            <i className="bi bi-paperclip me-1"></i> Đính kèm
                                         </label>
-                                        <input ref={fileInputRef} type="file" multiple className="form-control" />
+                                        <input ref={fileInputRef} type="file" multiple className="form-control form-control-sm" /> {/* form-control-sm */}
                                     </div>
+
+                                    <div className="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
+                                        <button 
+                                            className="btn btn-sm btn-light px-3"  // btn-sm
+                                            onClick={() => navigate(-1)}
+                                            disabled={loading}
+                                        >
+                                            Quay lại
+                                        </button>
+                                        <button 
+                                            className="btn btn-sm btn-primary px-4 fw-bold shadow-sm" // btn-sm
+                                            onClick={onSubmit} 
+                                            disabled={loading || !token}
+                                            style={{ backgroundColor: '#008784', borderColor: '#008784' }}
+                                        >
+                                            {loading ? (
+                                                <>
+                                                    <span className="spinner-border spinner-border-sm me-2"></span>
+                                                    Đang gửi...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="bi bi-send-fill me-2"></i> Gửi Yêu Cầu
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
                                 </div>
                             ) : (
-                                <div className="text-center py-5 text-muted">
-                                    <i className="bi bi-arrow-up-circle fs-1 d-block mb-3"></i>
-                                    Vui lòng chọn <strong>Loại yêu cầu</strong> ở trên để tiếp tục.
+                                <div className="text-center py-5">
+                                    <div className="mb-2 text-muted opacity-25">
+                                        <i className="bi bi-inbox fs-2"></i>
+                                    </div>
+                                    <small className="text-muted">Chọn loại yêu cầu ở trên</small>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
 
-                {/* RIGHT: AI */}
+                {/* RIGHT: AI Suggestions - Compact */}
                 {aiSuggestions.length > 0 && (
-                    <div className="col-lg-4">
-                        <div className="card border-0 shadow-sm bg-info-subtle sticky-top" style={{top: 80}}>
-                            <div className="card-header bg-transparent border-0 pt-3 pb-0">
-                                <h6 className="fw-bold text-info-emphasis">
-                                    <i className="bi bi-robot me-2"></i> Gợi ý thông minh
+                    <div className="col-lg-3">
+                        <div className="card border-0 shadow-sm bg-primary-subtle sticky-top" style={{top: 10}}>
+                            <div className="card-header bg-transparent border-0 pt-2 pb-0">
+                                <h6 className="fw-bold text-primary-emphasis d-flex align-items-center small mb-1">
+                                    <i className="bi bi-stars me-2"></i> Gợi ý AI
                                 </h6>
                             </div>
-                            <div className="card-body">
-                                <p className="small text-muted mb-3">
-                                    Có thể bạn đang gặp vấn đề này? Thử các giải pháp sau trước khi gửi yêu cầu:
-                                </p>
-                                <div className="list-group list-group-flush rounded bg-white">
+                            <div className="card-body p-2">
+                                <div className="list-group list-group-flush rounded shadow-sm overflow-hidden">
                                     {aiSuggestions.map((s) => (
-                                        <div key={s.id} className="list-group-item p-3">
-                                            <div className="d-flex w-100 justify-content-between">
-                                                <h6 className="mb-1 text-dark fw-bold">{s.title}</h6>
-                                                <small className="text-success fw-bold">{(s.score * 100).toFixed(0)}% Match</small>
+                                        <div key={s.id} className="list-group-item list-group-item-action p-2 border-start border-3 border-primary">
+                                            <div className="d-flex w-100 justify-content-between align-items-center mb-1">
+                                                <h6 className="mb-0 fw-bold text-dark text-truncate small" style={{maxWidth: '120px'}} title={s.title}>{s.title}</h6>
+                                                <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style={{fontSize: '0.6rem'}}>
+                                                    {(s.score * 100).toFixed(0)}%
+                                                </span>
                                             </div>
-                                            <p className="mb-1 small text-secondary">{s.suggestion}</p>
+                                            <p className="mb-0 small text-secondary lh-1" style={{fontSize: '0.75rem'}}>{s.suggestion}</p>
                                         </div>
                                     ))}
                                 </div>

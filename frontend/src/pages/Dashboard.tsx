@@ -71,18 +71,17 @@ export default function Dashboard() {
       return { total, pending, progress, urgent };
   }, [stats]);
 
-  // --- CHART DATA ---
+  // --- CHART CONFIG ---
   const chartConfig = useMemo(() => {
     if (!stats) return null;
     const statusData = stats.statusCounts || [];
     
-    // Định nghĩa màu sắc chuẩn Odoo/Bootstrap
     const statusMap: Record<string, { label: string, color: string }> = {
-        'NEW': { label: 'Mới', color: '#6c757d' }, // Secondary
-        'PENDING': { label: 'Chờ duyệt', color: '#ffc107' }, // Warning
-        'IN_PROGRESS': { label: 'Đang xử lý', color: '#0d6efd' }, // Primary
-        'COMPLETED': { label: 'Hoàn thành', color: '#198754' }, // Success
-        'CANCELLED': { label: 'Đã hủy', color: '#dc3545' } // Danger
+        'NEW': { label: 'Mới', color: '#6c757d' }, 
+        'PENDING': { label: 'Chờ duyệt', color: '#ffc107' }, 
+        'IN_PROGRESS': { label: 'Đang xử lý', color: '#0d6efd' }, 
+        'COMPLETED': { label: 'Hoàn thành', color: '#198754' }, 
+        'CANCELLED': { label: 'Đã hủy', color: '#dc3545' } 
     };
 
     const labels = Object.keys(statusMap);
@@ -105,6 +104,7 @@ export default function Dashboard() {
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { position: 'bottom' as const },
             title: { display: false }
@@ -113,18 +113,19 @@ export default function Dashboard() {
     };
   }, [stats]);
 
-  // --- RENDER KPI CARD COMPONENT ---
+  // --- COMPONENT: KPI CARD (Flat Design) ---
   const KpiCard = ({ title, value, icon, color, subtext }: any) => (
-      <div className="col-md-3 col-sm-6">
-          <div className="card shadow-sm border-0 h-100">
-              <div className="card-body d-flex align-items-center">
-                  <div className={`rounded-circle p-3 me-3 bg-${color}-subtle text-${color}`}>
+      <div className="col-md-6 col-lg-3">
+          {/* Dùng border thay vì shadow để dính liền nền */}
+          <div className="card border h-100 rounded-3 bg-white"> 
+              <div className="card-body d-flex align-items-center p-3">
+                  <div className={`rounded-circle p-3 me-3 bg-${color}-subtle text-${color} d-flex align-items-center justify-content-center`} style={{width: 52, height: 52}}>
                       <i className={`bi ${icon} fs-4`}></i>
                   </div>
-                  <div>
-                      <div className="text-muted small text-uppercase fw-bold">{title}</div>
+                  <div className="overflow-hidden">
+                      <div className="text-muted small text-uppercase fw-bold text-truncate" style={{fontSize: '0.7rem', letterSpacing: '0.5px'}}>{title}</div>
                       <div className="h3 mb-0 fw-bold text-dark">{value}</div>
-                      {subtext && <small className="text-muted" style={{fontSize: '0.7rem'}}>{subtext}</small>}
+                      {subtext && <small className="text-secondary text-truncate d-block" style={{fontSize: '0.75rem'}}>{subtext}</small>}
                   </div>
               </div>
           </div>
@@ -132,163 +133,169 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="d-flex flex-column h-100 bg-light">
+    <div className="d-flex flex-column h-100 bg-white">
       
-      {/* 1. CONTROL PANEL */}
-      <div className="o_control_panel bg-white border-bottom px-4 py-2 d-flex justify-content-between align-items-center sticky-top shadow-sm" style={{zIndex: 99, height: 60}}>
-        <div>
-           <nav aria-label="breadcrumb">
-            <ol className="breadcrumb mb-0 small">
-              <li className="breadcrumb-item text-muted">Hệ thống</li>
-              <li className="breadcrumb-item active fw-bold text-primary">Tổng quan (Dashboard)</li>
-            </ol>
-          </nav>
+      {/* 1. HEADER (CONTROL PANEL) - Sticky & Full Width */}
+      <div className="border-bottom px-4 py-2 d-flex justify-content-between align-items-center bg-white sticky-top" style={{zIndex: 100, height: 56}}>
+        
+        {/* Left: Title */}
+        <div className="d-flex align-items-center gap-3">
+           <h6 className="fw-bold text-dark m-0">TỔNG QUAN</h6>
+           <div className="vr h-50"></div>
+           <span className="text-muted small">Xin chào, <strong>{user?.name}</strong></span>
         </div>
 
+        {/* Right: Tools */}
         <div className="d-flex gap-2 align-items-center">
+            
             {/* Filter Category */}
-            <div className="input-group input-group-sm">
-                <span className="input-group-text bg-light text-muted">Phòng ban</span>
-                <select 
-                    className="form-select" 
-                    value={selectedCategory} 
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    style={{maxWidth: 120}}
-                >
-                    <option value="ALL">Tất cả</option>
-                    <option value="IT">IT Support</option>
-                    <option value="HR">Nhân sự</option>
-                </select>
-            </div>
+            <select 
+                className="form-select form-select-sm bg-light border-0 fw-500" 
+                value={selectedCategory} 
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                style={{maxWidth: 130, cursor: 'pointer'}}
+            >
+                <option value="ALL">Toàn bộ</option>
+                <option value="IT">IT Support</option>
+                <option value="HR">Nhân sự</option>
+            </select>
 
-            {/* Filter Chart Type */}
-            <div className="btn-group btn-group-sm" role="group">
+            <div className="vr h-50 mx-1"></div>
+
+            {/* Chart Type Toggle */}
+            <div className="btn-group btn-group-sm bg-light rounded p-0" role="group">
                 <button 
-                    className={`btn ${chartType === 'DOUGHNUT' ? 'btn-secondary' : 'btn-outline-secondary'}`} 
-                    onClick={() => setChartType('DOUGHNUT')} title="Biểu đồ tròn"
+                    className={`btn btn-sm border-0 rounded ${chartType === 'DOUGHNUT' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`} 
+                    onClick={() => setChartType('DOUGHNUT')} title="Tròn"
                 >
                     <i className="bi bi-pie-chart-fill"></i>
                 </button>
                 <button 
-                    className={`btn ${chartType === 'BAR' ? 'btn-secondary' : 'btn-outline-secondary'}`} 
-                    onClick={() => setChartType('BAR')} title="Biểu đồ cột"
+                    className={`btn btn-sm border-0 rounded ${chartType === 'BAR' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`} 
+                    onClick={() => setChartType('BAR')} title="Cột"
                 >
                     <i className="bi bi-bar-chart-fill"></i>
                 </button>
             </div>
 
-            <div className="vr mx-1"></div>
-
-            <button className="btn btn-sm btn-success" onClick={handleExport}>
-                <i className="bi bi-file-earmark-spreadsheet me-2"></i> Xuất Báo cáo
+            <button className="btn btn-sm btn-success fw-bold ms-2 shadow-sm" onClick={handleExport}>
+                <i className="bi bi-file-earmark-arrow-down me-1"></i> Xuất
             </button>
         </div>
       </div>
 
-      {/* 2. MAIN CONTENT */}
-      <div className="flex-grow-1 p-4 overflow-y-auto">
+      {/* 2. MAIN CONTENT - Full White Canvas */}
+      <div className="flex-grow-1 overflow-y-auto">
         
-        {/* Header Greeting */}
-        <div className="mb-4">
-            <h4 className="fw-bold text-dark mb-1">Xin chào, {user?.name} 👋</h4>
-            <p className="text-muted small">Dưới đây là tình hình hoạt động của hệ thống {selectedCategory === 'ALL' ? '' : selectedCategory}.</p>
-        </div>
-
-        {/* KPI CARDS */}
-        <div className="row g-4 mb-4">
-            <KpiCard 
-                title="Tổng yêu cầu" 
-                value={kpiData.total} 
-                icon="bi-layers-fill" 
-                color="primary" 
-                subtext="Tất cả thời gian"
-            />
-            <KpiCard 
-                title="Chờ phê duyệt" 
-                value={kpiData.pending} 
-                icon="bi-hourglass-split" 
-                color="warning" 
-                subtext="Cần xử lý ngay"
-            />
-            <KpiCard 
-                title="Đang thực hiện" 
-                value={kpiData.progress} 
-                icon="bi-gear-wide-connected" 
-                color="info" 
-                subtext="Đang được giải quyết"
-            />
-            <KpiCard 
-                title="Khẩn cấp" 
-                value={kpiData.urgent} 
-                icon="bi-exclamation-triangle-fill" 
-                color="danger" 
-                subtext="Mức độ ưu tiên cao"
-            />
-        </div>
-
-        {/* CHARTS & DETAILS */}
-        <div className="row g-4">
-            {/* Left: Chart */}
-            <div className="col-lg-7">
-                <div className="card shadow-sm border-0 h-100">
-                    <div className="card-header bg-white border-bottom-0 pt-3 pb-0">
-                        <h6 className="fw-bold text-dark m-0">Phân bố trạng thái</h6>
-                    </div>
-                    <div className="card-body d-flex align-items-center justify-content-center" style={{minHeight: 350}}>
-                        {loading ? (
-                            <div className="spinner-border text-primary" role="status"></div>
-                        ) : chartConfig ? (
-                            <div style={{ width: '100%', maxWidth: chartType === 'BAR' ? '100%' : '320px' }}>
-                                {chartType === 'DOUGHNUT' && <Doughnut data={chartConfig.data} options={chartConfig.options} />}
-                                {chartType === 'BAR' && <Bar data={chartConfig.data} options={chartConfig.options} />}
-                                {chartType === 'PIE' && <Pie data={chartConfig.data} options={chartConfig.options} />}
-                            </div>
-                        ) : (
-                            <div className="text-muted">Chưa có dữ liệu</div>
-                        )}
-                    </div>
-                </div>
+        {/* Container fluid, padding vừa phải, nền trắng hoàn toàn */}
+        <div className="container-fluid p-4" style={{maxWidth: 1600}}>
+            
+            {/* KPI ROW */}
+            <div className="row g-3 mb-4">
+                <KpiCard 
+                    title="Tổng yêu cầu" 
+                    value={kpiData.total} 
+                    icon="bi-layers-fill" 
+                    color="primary" 
+                    subtext="Tất cả thời gian"
+                />
+                <KpiCard 
+                    title="Cần xử lý" 
+                    value={kpiData.pending} 
+                    icon="bi-hourglass-split" 
+                    color="warning" 
+                    subtext="Đang chờ duyệt"
+                />
+                <KpiCard 
+                    title="Đang thực hiện" 
+                    value={kpiData.progress} 
+                    icon="bi-gear-wide-connected" 
+                    color="info" 
+                    subtext="Tiến độ công việc"
+                />
+                <KpiCard 
+                    title="Khẩn cấp" 
+                    value={kpiData.urgent} 
+                    icon="bi-exclamation-triangle-fill" 
+                    color="danger" 
+                    subtext="Ưu tiên cao"
+                />
             </div>
 
-            {/* Right: Data Table */}
-            <div className="col-lg-5">
-                <div className="card shadow-sm border-0 h-100">
-                    <div className="card-header bg-white border-bottom-0 pt-3 pb-0">
-                        <h6 className="fw-bold text-dark m-0">Chi tiết số liệu</h6>
-                    </div>
-                    <div className="card-body p-0 pt-2">
-                        <div className="table-responsive">
-                            <table className="table table-hover align-middle mb-0">
-                                <thead className="bg-light">
-                                    <tr>
-                                        <th className="ps-4 small text-muted text-uppercase">Trạng thái</th>
-                                        <th className="text-end pe-4 small text-muted text-uppercase">Số lượng</th>
-                                        <th className="text-end pe-4 small text-muted text-uppercase">Tỷ lệ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {/* [FIX] Removed unused 'idx' parameter */}
-                                    {stats?.statusCounts?.map((s: any) => {
-                                        const percent = kpiData.total > 0 ? ((s.count / kpiData.total) * 100).toFixed(1) : 0;
-                                        return (
-                                            <tr key={s._id}>
-                                                <td className="ps-4 fw-500">
-                                                    <span className={`badge me-2 bg-secondary rounded-pill`} style={{width: 8, height: 8, padding: 0, display: 'inline-block'}}> </span>
-                                                    {s._id}
-                                                </td>
-                                                <td className="text-end pe-4 fw-bold">{s.count}</td>
-                                                <td className="text-end pe-4 text-muted small">{percent}%</td>
-                                            </tr>
-                                        )
-                                    })}
-                                    {(!stats?.statusCounts || stats.statusCounts.length === 0) && (
-                                        <tr><td colSpan={3} className="text-center py-4 text-muted">Không có dữ liệu</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+            {/* CHARTS & TABLE ROW */}
+            <div className="row g-4">
+                
+                {/* Left: Chart */}
+                <div className="col-lg-7 col-xl-8">
+                    {/* Dùng border thay vì shadow */}
+                    <div className="card border h-100 rounded-3">
+                        <div className="card-header bg-white border-bottom py-3">
+                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-pie-chart me-2 text-primary"></i>Phân tích trạng thái</h6>
+                        </div>
+                        <div className="card-body" style={{height: 400}}>
+                            {loading ? (
+                                <div className="d-flex align-items-center justify-content-center h-100">
+                                    <div className="spinner-border text-primary" role="status"></div>
+                                </div>
+                            ) : chartConfig ? (
+                                <div className="h-100 w-100 d-flex justify-content-center align-items-center">
+                                    {chartType === 'DOUGHNUT' && <Doughnut data={chartConfig.data} options={chartConfig.options} />}
+                                    {chartType === 'BAR' && <Bar data={chartConfig.data} options={chartConfig.options} />}
+                                    {chartType === 'PIE' && <Pie data={chartConfig.data} options={chartConfig.options} />}
+                                </div>
+                            ) : (
+                                <div className="d-flex align-items-center justify-content-center h-100 text-muted">Chưa có dữ liệu</div>
+                            )}
                         </div>
                     </div>
                 </div>
+
+                {/* Right: Detailed Table */}
+                <div className="col-lg-5 col-xl-4">
+                    <div className="card border h-100 rounded-3">
+                        <div className="card-header bg-white border-bottom py-3">
+                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-table me-2 text-success"></i>Chi tiết số liệu</h6>
+                        </div>
+                        <div className="card-body p-0">
+                            <div className="table-responsive">
+                                <table className="table table-hover align-middle mb-0">
+                                    <thead className="bg-light border-bottom">
+                                        <tr>
+                                            <th className="ps-4 small text-muted text-uppercase fw-bold py-3">Trạng thái</th>
+                                            <th className="text-end small text-muted text-uppercase fw-bold py-3">SL</th>
+                                            <th className="text-end pe-4 small text-muted text-uppercase fw-bold py-3">%</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {stats?.statusCounts?.map((s: any) => {
+                                            const percent = kpiData.total > 0 ? ((s.count / kpiData.total) * 100).toFixed(1) : 0;
+                                            return (
+                                                <tr key={s._id}>
+                                                    <td className="ps-4 fw-500 small">
+                                                        <span className={`badge me-2 rounded-pill border`} 
+                                                              style={{
+                                                                  width: 10, height: 10, padding: 0, display: 'inline-block',
+                                                                  backgroundColor: s._id === 'COMPLETED' ? '#198754' : s._id === 'PENDING' ? '#ffc107' : '#6c757d',
+                                                                  borderColor: 'rgba(0,0,0,0.1)'
+                                                              }}> 
+                                                        </span>
+                                                        {s._id}
+                                                    </td>
+                                                    <td className="text-end fw-bold small">{s.count}</td>
+                                                    <td className="text-end pe-4 text-muted small">{percent}%</td>
+                                                </tr>
+                                            )
+                                        })}
+                                        {(!stats?.statusCounts || stats.statusCounts.length === 0) && (
+                                            <tr><td colSpan={3} className="text-center py-5 text-muted small">Không có dữ liệu</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 

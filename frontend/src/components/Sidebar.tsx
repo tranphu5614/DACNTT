@@ -3,104 +3,115 @@ import { useAuth } from '../context/AuthContext';
 
 type Variant = 'static' | 'offcanvas';
 
+// Màu sắc chuẩn Odoo Dark Theme
+const THEME = {
+  BG: '#1e2327',           
+  ACTIVE_BG: '#2a3036',    
+  ACTIVE_BORDER: '#008784',
+  TEXT_MAIN: '#e9ecef',
+  TEXT_MUTED: '#adb5bd'
+};
+
 export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
   const { user, hasRole } = useAuth();
   
   const isAdmin = hasRole('ADMIN');
   const isManager = isAdmin || hasRole('MANAGER') || hasRole('HR_MANAGER') || hasRole('IT_MANAGER');
 
-  // Component Link nội bộ để tái sử dụng style
+  // --- ITEM COMPONENT ---
   const MenuLink = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
     <li className="nav-item w-100">
       <NavLink
         to={to}
         className={({ isActive }) =>
-          `nav-link d-flex align-items-center py-2 px-3 mb-1 rounded transition-all ${
-            isActive 
-              ? 'bg-primary text-white shadow-sm fw-medium' 
-              : 'text-white-50 hover-text-white'
+          `nav-link d-flex align-items-center py-2 px-3 rounded-0 transition-all ${
+            isActive ? 'active-item' : 'text-white-50 hover-text-white'
           }`
         }
-        style={{ fontSize: '0.95rem' }}
+        style={({ isActive }) => ({
+            fontSize: '0.9rem',
+            color: isActive ? THEME.TEXT_MAIN : undefined,
+            backgroundColor: isActive ? THEME.ACTIVE_BG : 'transparent',
+            borderLeft: isActive ? `4px solid ${THEME.ACTIVE_BORDER}` : '4px solid transparent',
+            paddingLeft: isActive ? '12px' : '16px' 
+        })}
       >
-        <i className={`bi ${icon} me-3 fs-5 opacity-75`}></i>
-        <span>{label}</span>
+        <i className={`bi ${icon} me-3 fs-6 ${!window.location.pathname.includes(to) ? 'opacity-75' : ''}`}></i>
+        <span className="fw-medium">{label}</span>
       </NavLink>
     </li>
   );
 
   const SectionTitle = ({ label }: { label: string }) => (
-    <div className="text-uppercase small text-muted fw-bold mt-4 mb-2 ps-3" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>
+    <div className="text-uppercase fw-bold mt-4 mb-2 ps-3 small" style={{ fontSize: '0.65rem', letterSpacing: '1px', color: '#6c757d' }}>
       {label}
     </div>
   );
 
-  // Nội dung chính của Sidebar (Dark Theme)
+  // --- CONTENT (Flex Column để xử lý cuộn nội bộ) ---
   const SidebarContent = () => (
     <div className="d-flex flex-column h-100 text-white">
-      {/* BRAND / LOGO AREA */}
-      <div className="d-flex align-items-center px-3 mb-4 flex-shrink-0">
-        <div className="bg-white text-primary rounded d-flex align-items-center justify-content-center me-2" style={{width: 38, height: 38}}>
-           <i className="bi bi-grid-3x3-gap-fill fs-4"></i>
+      
+      {/* 1. HEADER */}
+      <div className="d-flex align-items-center px-3 py-3 flex-shrink-0" style={{height: 60, borderBottom: '1px solid rgba(255,255,255,0.05)'}}>
+        <div className="rounded d-flex align-items-center justify-content-center me-2" 
+             style={{width: 32, height: 32, backgroundColor: THEME.ACTIVE_BORDER}}>
+            <i className="bi bi-grid-fill text-white fs-6"></i>
         </div>
         <div>
-          <div className="fw-bold fs-5 lh-1">Request</div>
-          <small className="text-white-50" style={{fontSize: '0.7rem'}}>Internal System</small>
+          <div className="fw-bold fs-6 lh-1 tracking-tight">Internal Portal</div>
         </div>
       </div>
 
-      <div className="flex-grow-1 overflow-auto custom-scrollbar px-2">
-        <ul className="nav nav-pills flex-column">
+      {/* 2. MENU LIST (Chỉ vùng này cuộn) */}
+      <div className="flex-grow-1 overflow-y-auto custom-scrollbar py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#495057 transparent' }}>
+        <ul className="nav flex-column mb-0">
           
-          {/* 1. PERSONAL */}
-          <MenuLink to="/requests/new" icon="bi-plus-circle-fill" label="Tạo yêu cầu" />
-          <MenuLink to="/requests/mine" icon="bi-list-check" label="Yêu cầu của tôi" />
-          <MenuLink to="/profile" icon="bi-person-circle" label="Hồ sơ cá nhân" />
+          <SectionTitle label="Cá nhân" />
+          <MenuLink to="/dashboard" icon="bi-speedometer2" label="Tổng quan" />
+          <MenuLink to="/requests/new" icon="bi-plus-circle" label="Tạo yêu cầu" />
+          <MenuLink to="/requests/mine" icon="bi-list-task" label="Yêu cầu của tôi" />
+          <MenuLink to="/profile" icon="bi-person-gear" label="Hồ sơ cá nhân" />
 
-          {/* 2. MANAGEMENT */}
           {isManager && (
             <>
               <SectionTitle label="Quản lý" />
-              <MenuLink to="/dashboard" icon="bi-speedometer2" label="Tổng quan" />
-              
-              {(isAdmin || hasRole('HR_MANAGER')) && (
-                 <MenuLink to="/queue/hr" icon="bi-people-fill" label="Hàng chờ HR" />
-              )}
-              
-              {(isAdmin || hasRole('IT_MANAGER')) && (
-                 <MenuLink to="/queue/it" icon="bi-pc-display" label="Hàng chờ IT" />
-              )}
+              {(isAdmin || hasRole('HR_MANAGER')) && <MenuLink to="/queue/hr" icon="bi-people" label="Hàng chờ HR" />}
+              {(isAdmin || hasRole('IT_MANAGER')) && <MenuLink to="/queue/it" icon="bi-pc-display" label="Hàng chờ IT" />}
             </>
           )}
 
-          {/* 3. ADMIN */}
           {isAdmin && (
             <>
-               <SectionTitle label="Hệ thống" />
-               <MenuLink to="/admin/users" icon="bi-people-fill" label="Người dùng" />
-               <MenuLink to="/admin/users/create" icon="bi-person-plus-fill" label="Thêm User" />
+                <SectionTitle label="Hệ thống" />
+                <MenuLink to="/admin/users" icon="bi-people-fill" label="Nhân viên" />
+                <MenuLink to="/admin/settings" icon="bi-gear-fill" label="Cấu hình" />
             </>
           )}
+          
+          {/* Spacer để đảm bảo nội dung cuối không bị che */}
+          <div style={{height: 20}}></div> 
         </ul>
       </div>
 
-      {/* USER FOOTER */}
-      <div className="mt-auto pt-3 border-top border-secondary px-2 flex-shrink-0">
-        <div className="dropdown">
-          <a href="#" className="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-2 rounded hover-bg-dark-light" data-bs-toggle="dropdown" aria-expanded="false">
-            <div className="rounded-circle bg-primary d-flex align-items-center justify-content-center me-2 border border-2 border-dark" style={{ width: 32, height: 32 }}>
+      {/* 3. USER FOOTER */}
+      <div className="mt-auto p-3 flex-shrink-0" style={{borderTop: '1px solid rgba(255,255,255,0.05)'}}>
+        <div className="dropdown w-100">
+          <a href="#" className="d-flex align-items-center text-white text-decoration-none dropdown-toggle p-2 rounded hover-bg-white-10" data-bs-toggle="dropdown">
+            <div className="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2 text-white small fw-bold" 
+                 style={{ width: 32, height: 32 }}>
                {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <div className="overflow-hidden">
-               <div className="fw-bold text-truncate" style={{maxWidth: 140}}>{user?.name || 'User'}</div>
-               <div className="small text-white-50 text-truncate" style={{fontSize: '0.75rem'}}>{user?.email}</div>
+            <div className="overflow-hidden flex-grow-1">
+               <div className="fw-bold text-truncate small lh-1 mb-1">{user?.name || 'User'}</div>
+               <div className="text-white-50 text-truncate" style={{fontSize: '0.7rem'}}>Online</div>
             </div>
           </a>
-          <ul className="dropdown-menu dropdown-menu-dark shadow">
-            <li><NavLink className="dropdown-item" to="/profile">Cài đặt tài khoản</NavLink></li>
-            <li><hr className="dropdown-divider" /></li>
+          <ul className="dropdown-menu dropdown-menu-dark shadow-lg border-0 mb-2 w-100">
+            <li><NavLink className="dropdown-item small" to="/profile"><i className="bi bi-person me-2"></i>Hồ sơ</NavLink></li>
+            <li><hr className="dropdown-divider border-secondary border-opacity-50" /></li>
             <li>
-                <button className="dropdown-item text-danger" onClick={() => {
+                <button className="dropdown-item text-danger small" onClick={() => {
                     localStorage.removeItem('token');
                     window.location.href = '/login';
                 }}>
@@ -114,27 +125,34 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
   );
 
   // --- RENDER ---
-  
-  // 1. Mobile Offcanvas Render
+
+  // 1. Mobile Offcanvas
   if (variant === 'offcanvas') {
     return (
-      <div className="offcanvas offcanvas-start bg-dark" tabIndex={-1} id="appSidebar" aria-labelledby="appSidebarLabel">
-        <div className="offcanvas-header border-bottom border-secondary">
-          <h5 className="offcanvas-title text-white" id="appSidebarLabel">Menu</h5>
-          <button type="button" className="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close" />
-        </div>
-        <div className="offcanvas-body p-3">
+      <div className="offcanvas offcanvas-start border-0 text-white" tabIndex={-1} id="appSidebar" 
+           style={{backgroundColor: THEME.BG, width: 260}}>
+        <div className="offcanvas-body p-0">
           <SidebarContent />
         </div>
       </div>
     );
   }
 
-  // 2. Desktop Static Render
+  // 2. Desktop Static (FIXED POSITION)
   return (
     <aside 
-        className="d-none d-lg-block bg-dark text-white p-3 sticky-top h-100" 
-        style={{ width: 260, minHeight: '100vh', top: 0 }}
+        className="d-none d-lg-block shadow-sm"
+        style={{ 
+            position: 'fixed', // QUAN TRỌNG: Cố định vị trí
+            top: 0,
+            left: 0,
+            bottom: 0,
+            width: 260, 
+            height: '100vh', // Chiều cao bằng 100% màn hình
+            backgroundColor: THEME.BG,
+            zIndex: 1040, // Đảm bảo nổi trên các thành phần khác nếu cần
+            overflow: 'hidden' // Ẩn thanh cuộn của khung ngoài
+        }}
     >
       <SidebarContent />
     </aside>
