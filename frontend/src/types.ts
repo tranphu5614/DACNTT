@@ -10,6 +10,11 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   avatar?: string;
+
+  // [MỚI] Bổ sung các trường này để sửa lỗi build TypeScript
+  isVerified?: boolean; // Trạng thái xác thực (khớp với Backend)
+  isActive?: boolean;   // Trạng thái hoạt động (dùng cho UI nếu cần)
+  jobTitle?: string;    // Chức danh công việc
 }
 
 export interface LoginResponse {
