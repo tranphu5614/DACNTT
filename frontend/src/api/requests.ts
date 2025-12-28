@@ -128,6 +128,19 @@ export function apiMyRequests(
   return request<ListResponse<MyRequestItem>>(`/requests/mine?${q.toString()}`, { method: 'GET' }, token);
 }
 
+// [MỚI] API Lấy danh sách việc được giao (Assigned Tasks)
+export function apiGetAssignedRequests(
+  token: string,
+  params: { page?: number; limit?: number } = {}
+) {
+  if (!token) throw new Error('Missing token');
+  const q = new URLSearchParams({
+    page: String(params.page || 1),
+    limit: String(params.limit || 20)
+  });
+  return request<ListResponse<MyRequestItem>>(`/requests/assigned?${q.toString()}`, { method: 'GET' }, token);
+}
+
 export function apiQueueRequests(
   token: string,
   params: {
@@ -186,7 +199,7 @@ export function apiAssignRequest(token: string, requestId: string, assigneeId: s
   );
 }
 
-// [MỚI - QUAN TRỌNG] Cập nhật trạng thái (Hoàn thành / Hủy)
+// [QUAN TRỌNG] Cập nhật trạng thái (Hoàn thành / Hủy)
 export function apiUpdateStatus(token: string, id: string, status: string) {
   if (!token) throw new Error('Missing token');
   return request(

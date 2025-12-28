@@ -12,17 +12,20 @@ import { CatalogModule } from './catalog/catalog.module';
 import { AiModule } from './ai/ai.module';
 import { MailModule } from './mail/mail.module';
 import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
+import { WorkflowsModule } from './workflows/workflows.module'; // [MỚI] Import
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     
-    // [FIX] Sửa lại dòng này
     ServeStaticModule.forRoot({
-      // process.cwd() trả về thư mục gốc nơi chạy lệnh (trong Docker là /app)
-      // Kết quả: /app/uploads -> Chính xác nơi chứa ảnh
       rootPath: join(process.cwd(), 'uploads'), 
-      serveRoot: '/uploads', 
+      serveRoot: '/uploads',
+      // [FIX] Thêm dòng này để ngăn lỗi ENOENT index.html
+      serveStaticOptions: {
+        index: false, 
+        fallthrough: false,
+      },
     }),
 
     MongooseModule.forRootAsync({
@@ -41,6 +44,7 @@ import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
     RequestsModule,
     CatalogModule,
     AiModule,
+    WorkflowsModule, // [MỚI] Bắt buộc phải có dòng này API mới chạy được
   ],
 })
 export class AppModule {

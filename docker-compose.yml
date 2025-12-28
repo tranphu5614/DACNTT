@@ -20,7 +20,7 @@ services:
       - PORT=3000
       - MONGO_URI=mongodb://mongodb:27017/reqsys
       - JWT_SECRET=supersecret_key_change_this
-      - GEMINI_API_KEY=
+      - GEMINI_API_KEY=AIzaSyCd4NONzPTq-P_-mwXTk_BJXJj_SXK46JA
       - BACKEND_URL=http://localhost:3000
       - FRONTEND_URL=http://localhost
     ports:

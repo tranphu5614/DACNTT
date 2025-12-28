@@ -12,6 +12,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import ProfilePage from './pages/ProfilePage';
 import RequestNewPage from './pages/NewRequestPage';
 import MyRequestsPage from './pages/MyRequestsPage';
+import AssignedTasksPage from './pages/AssignedTasksPage';
 import AdminUsersListPage from './pages/AdminUsersListPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import UserDetailPage from './pages/UserDetailPage';
@@ -21,19 +22,15 @@ import RequestDetail from './pages/RequestDetail';
 import Dashboard from './pages/Dashboard';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import WorkflowConfigPage from './pages/WorkflowConfigPage'; // [MỚI] Import trang cấu hình
 
 // Components
 import Chatbot from './components/Chatbot';
 
-// --- LAYOUT CON (Đã sửa để không bị giới hạn chiều rộng) ---
+// --- LAYOUT CON ---
 const AuthLayout = () => {
   return (
     <div className="container-fluid min-vh-100 d-flex align-items-center justify-content-center py-5 bg-light">
-      {/* THAY ĐỔI QUAN TRỌNG:
-         - Xóa 'container' ở thẻ cha để dùng 'container-fluid' giúp full width nền.
-         - Xóa style maxWidth: 500px ở đây.
-         - Thêm 'w-100' và 'd-flex justify-content-center' để con tự căn chỉnh.
-      */}
       <div className="w-100 d-flex justify-content-center px-3"> 
          <Outlet />
       </div>
@@ -44,29 +41,24 @@ const AuthLayout = () => {
 export default function App() {
   const { token, user, logout } = useAuth();
 
-  // [LOGIC MỚI] Chưa đăng nhập
+  // Chưa đăng nhập
   if (!token) {
     return (
       <Routes>
-        {/* Nhóm trang Public (Login, Register...) dùng AuthLayout */}
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
-
-        {/* Trang Verify Email tự lo layout riêng (để full màn hình nếu cần) */}
         <Route path="/verify-email" element={<VerifyEmailPage />} />
-
-        {/* Redirect mặc định */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }
 
-  // [LOGIC MỚI] Đã đăng nhập (Main Layout) - Giữ nguyên như cũ
+  // Đã đăng nhập
   return (
     <div className="d-flex flex-column min-vh-100 bg-light">
       {/* Navbar Top */}
@@ -109,6 +101,8 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/requests/new" element={<RequestNewPage />} />
               <Route path="/requests/mine" element={<MyRequestsPage />} />
+              <Route path="/tasks" element={<AssignedTasksPage />} />
+              
               <Route path="/requests/pending" element={<RequestsToApprove />} />
               <Route path="/requests/:id" element={<RequestDetail />} />
               
@@ -129,6 +123,9 @@ export default function App() {
             <Route path="/admin/users" element={<RequireAdmin><AdminUsersListPage /></RequireAdmin>} />
             <Route path="/admin/users/create" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
             <Route path="/admin/users/:id" element={<RequireAdmin><UserDetailPage /></RequireAdmin>} />
+            
+            {/* [MỚI] Route cấu hình Workflow */}
+            <Route path="/admin/workflows" element={<RequireAdmin><WorkflowConfigPage /></RequireAdmin>} />
 
             <Route path="/" element={<Navigate to="/profile" replace />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />

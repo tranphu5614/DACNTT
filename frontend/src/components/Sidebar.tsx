@@ -71,6 +71,10 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
           <MenuLink to="/dashboard" icon="bi-speedometer2" label="Overview" />
           <MenuLink to="/requests/new" icon="bi-plus-circle" label="New Request" />
           <MenuLink to="/requests/mine" icon="bi-list-task" label="My Requests" />
+          
+          {/* Link đến trang Công việc được giao */}
+          <MenuLink to="/tasks" icon="bi-briefcase" label="My Tasks" />
+          
           <MenuLink to="/profile" icon="bi-person-gear" label="My Profile" />
 
           {isManager && (
@@ -85,6 +89,10 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
             <>
                 <SectionTitle label="System" />
                 <MenuLink to="/admin/users" icon="bi-people-fill" label="Employees" />
+                
+                {/* [MỚI] Link cấu hình Workflow */}
+                <MenuLink to="/admin/workflows" icon="bi-diagram-3-fill" label="Approval Workflows" />
+                
                 <MenuLink to="/admin/settings" icon="bi-gear-fill" label="Settings" />
             </>
           )}
