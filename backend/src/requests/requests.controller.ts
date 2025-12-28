@@ -71,7 +71,7 @@ export class RequestsController {
     return this.requestsService.getAvailableRooms(date, from, to, size);
   }
 
-  // [MY REQUESTS] Yêu cầu của tôi
+  // [MY REQUESTS] Yêu cầu của tôi (Người gửi)
   @UseGuards(JwtAuthGuard)
   @Get('mine')
   async mine(
@@ -84,6 +84,21 @@ export class RequestsController {
     const p = page ? parseInt(page, 10) || 1 : 1;
     const l = limit ? parseInt(limit, 10) || 10 : 10;
     return this.requestsService.listMine(userId, p, l);
+  }
+
+  // [ASSIGNED REQUESTS] Công việc được giao (Người xử lý) -> API MỚI
+  @UseGuards(JwtAuthGuard)
+  @Get('assigned')
+  async getAssigned(
+    @Req() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const userId = extractUserId(req?.user);
+    if (!userId) throw new BadRequestException('User not found');
+    const p = page ? parseInt(page, 10) || 1 : 1;
+    const l = limit ? parseInt(limit, 10) || 10 : 10;
+    return this.requestsService.listAssigned(userId, p, l);
   }
 
   // [QUEUE] Hàng chờ xử lý (Generic cho mọi phòng ban)

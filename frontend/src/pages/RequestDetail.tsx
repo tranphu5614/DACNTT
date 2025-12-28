@@ -14,7 +14,7 @@ import { apiGetStaffsByDept, UserItem } from '../api/users';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-// --- HELPER FUNCTIONS (Format dữ liệu cho đẹp) ---
+// --- HELPER FUNCTIONS ---
 const formatDate = (dateString: string | Date) => {
   if (!dateString) return '-';
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -24,7 +24,6 @@ const formatDate = (dateString: string | Date) => {
 
 const formatLabel = (str: string) => {
   if (!str) return '';
-  // Chuyển 'some_variable_name' thành 'Some Variable Name'
   return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
@@ -54,6 +53,7 @@ export default function RequestDetail() {
     try {
       const res = await apiGetRequestDetail(token!, id!);
       setData(res);
+      // Chỉ load staff list nếu là Manager và không phải loại request đặc biệt
       if (res.category && !['HR', 'ADMIN'].includes(res.category)) {
           apiGetStaffsByDept(token!, res.category)
             .then(setStaffList)
@@ -80,7 +80,7 @@ export default function RequestDetail() {
       id: c._id,
       type: 'comment',
       author: c.author?.name || 'Unknown',
-      avatar: c.author?.name?.[0] || '?', // Lấy chữ cái đầu
+      avatar: c.author?.name?.[0] || '?',
       date: new Date(c.createdAt),
       content: c.content,
       isInternal: c.isInternal,
@@ -120,8 +120,14 @@ export default function RequestDetail() {
 
   // --- PERMISSIONS & WORKFLOW ---
   const isManager = hasRole('ADMIN') || hasRole('MANAGER') || hasRole('IT_MANAGER') || hasRole('HR_MANAGER');
+  // Workflow đơn giản là HR hoặc Admin hoặc Đặt phòng
   const isSimpleWorkflow = ['HR', 'ADMIN'].includes(data.category) || !!data.bookingRoomKey;
+  
+  // [QUAN TRỌNG] Quyền thay đổi trạng thái (Manager hoặc Assignee)
   const canChangeState = (isManager || user?._id === data.assignedTo?._id) && !isSimpleWorkflow;
+  
+  // [MỚI] Quyền hủy: Chỉ Requester, Manager hoặc Assignee mới được hủy
+  const canCancel = isManager || user?._id === data.requester?._id || user?._id === data.assignedTo?._id;
 
   let pipelineSteps = ['NEW', 'PENDING', 'IN_PROGRESS', 'COMPLETED'];
   let currentStep = data.status;
@@ -138,7 +144,7 @@ export default function RequestDetail() {
   return (
     <div className="d-flex flex-column h-100 bg-white font-sans">
       
-      {/* 1. HEADER (CONTROL PANEL) - Giữ nguyên logic cũ, chỉ chỉnh nhẹ padding */}
+      {/* 1. HEADER (CONTROL PANEL) */}
       <div className="border-bottom px-4 py-2 d-flex justify-content-between align-items-center bg-white sticky-top shadow-sm" style={{zIndex: 100, height: 60}}>
         
         <div className="d-flex gap-2 align-items-center">
@@ -146,7 +152,7 @@ export default function RequestDetail() {
                 <i className="bi bi-arrow-left"></i>
             </button>
             
-            {/* Actions Buttons */}
+            {/* Approval Actions (For Managers) */}
             {isManager && data.approvalStatus === 'PENDING' && (
                 <>
                     <button className="btn btn-sm btn-success fw-semibold px-3 d-flex align-items-center" onClick={() => handleAction(() => apiApproveRequest(token!, id!, 'Approved'), 'Approve request?')}>
@@ -161,6 +167,7 @@ export default function RequestDetail() {
                 </>
             )}
 
+            {/* Status Actions (For Assignee / IT Support) */}
             {canChangeState && (
                 <>
                     {data.status === 'NEW' && <button className="btn btn-sm btn-primary px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'IN_PROGRESS'))}>Start Progress</button>}
@@ -174,7 +181,8 @@ export default function RequestDetail() {
                 </>
             )}
 
-            {data.status !== 'COMPLETED' && data.status !== 'CANCELLED' && data.approvalStatus !== 'APPROVED' && data.approvalStatus !== 'REJECTED' && (
+            {/* Cancel Action */}
+            {canCancel && data.status !== 'COMPLETED' && data.status !== 'CANCELLED' && data.approvalStatus !== 'APPROVED' && data.approvalStatus !== 'REJECTED' && (
                  <button className="btn btn-sm btn-light border text-muted px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'CANCELLED'), 'Cancel request?')}>Cancel</button>
             )}
         </div>
@@ -188,7 +196,7 @@ export default function RequestDetail() {
       {/* 2. BODY - Split View */}
       <div className="flex-grow-1 overflow-hidden d-flex bg-light">
          
-         {/* --- LEFT COLUMN: MAIN CONTENT (Phần được thay đổi nhiều nhất) --- */}
+         {/* --- LEFT COLUMN: MAIN CONTENT --- */}
          <div className="flex-grow-1 overflow-y-auto custom-scrollbar">
              
              {/* Status Pipeline Bar */}
@@ -232,9 +240,8 @@ export default function RequestDetail() {
                     </div>
                 </div>
 
-                {/* Info Grid (Thay thế Table cũ) */}
+                {/* Info Grid */}
                 <div className="row g-4 mb-5">
-                    {/* Cột 1: Thông tin cơ bản */}
                     <div className="col-md-6">
                         <h6 className="text-uppercase text-secondary small fw-bold mb-3 ls-1 border-bottom pb-2">Request Info</h6>
                         <div className="d-flex justify-content-between mb-2">
@@ -251,7 +258,6 @@ export default function RequestDetail() {
                         </div>
                     </div>
 
-                    {/* Cột 2: Workflow & Assignee */}
                     <div className="col-md-6">
                         <h6 className="text-uppercase text-secondary small fw-bold mb-3 ls-1 border-bottom pb-2">Workflow</h6>
                         <div className="d-flex justify-content-between mb-2">
@@ -285,7 +291,7 @@ export default function RequestDetail() {
                     </div>
                 </div>
 
-                {/* Tabs Navigation (Style hiện đại hơn) */}
+                {/* Tabs Navigation */}
                 <ul className="nav nav-tabs nav-tabs-custom mb-4 border-bottom">
                     <li className="nav-item">
                         <button className={`nav-link px-4 py-2 ${activeTab === 'desc' ? 'active fw-bold border-bottom border-primary border-2 text-primary' : 'text-muted'}`} onClick={() => setActiveTab('desc')}>Description & Files</button>
@@ -301,7 +307,7 @@ export default function RequestDetail() {
                 {/* Tabs Content */}
                 <div className="min-vh-50">
                     
-                    {/* Tab 1: Description & Attachments */}
+                    {/* Tab 1: Description */}
                     {activeTab === 'desc' && (
                         <div className="animate__animated animate__fadeIn">
                             <div className="p-4 bg-light rounded-3 border mb-4 text-dark" style={{whiteSpace: 'pre-line', lineHeight: '1.6'}}>
@@ -329,7 +335,7 @@ export default function RequestDetail() {
                         </div>
                     )}
 
-                    {/* Tab 2: Custom Fields (Định dạng Table đẹp hơn) */}
+                    {/* Tab 2: Custom Fields */}
                     {activeTab === 'custom' && (
                         <div className="animate__animated animate__fadeIn">
                             <table className="table table-bordered table-striped-columns w-100">
@@ -348,7 +354,7 @@ export default function RequestDetail() {
                         </div>
                     )}
 
-                    {/* Tab 3: Approval Workflow */}
+                    {/* Tab 3: Approval */}
                     {activeTab === 'approval' && (
                         <div className="animate__animated animate__fadeIn">
                             <div className="table-responsive">
@@ -364,9 +370,9 @@ export default function RequestDetail() {
                                                 <td>
                                                     {step.approver ? (
                                                          <div className="d-flex align-items-center">
-                                                            <div className={`rounded-circle text-white d-flex align-items-center justify-content-center me-2 small ${getAvatarColor(step.approver.name)}`} style={{width: 28, height: 28}}>{step.approver.name[0]}</div>
-                                                            <span>{step.approver.name}</span>
-                                                        </div>
+                                                             <div className={`rounded-circle text-white d-flex align-items-center justify-content-center me-2 small ${getAvatarColor(step.approver.name)}`} style={{width: 28, height: 28}}>{step.approver.name[0]}</div>
+                                                             <span>{step.approver.name}</span>
+                                                         </div>
                                                     ) : '-'}
                                                 </td>
                                                 <td>
@@ -388,7 +394,7 @@ export default function RequestDetail() {
              </div>
          </div>
 
-         {/* --- RIGHT COLUMN: CHATTER (Sidebar) - Giữ nguyên logic --- */}
+         {/* --- RIGHT COLUMN: CHATTER --- */}
          <div className="border-start bg-white d-flex flex-column h-100 shadow-sm" style={{width: 380, minWidth: 380}}>
              
              <div className="p-3 border-bottom bg-light text-dark fw-bold small d-flex justify-content-between align-items-center">

@@ -17,6 +17,7 @@ import { DEFAULT_CATALOG } from '../catalog/catalog.data';
 import { ERROR_SUGGESTIONS } from './suggestions.data';
 import { PriorityClassifierService } from '../ai/priority-classifier.service';
 import { UsersService } from '../users/users.service';
+import { WorkflowsService } from '../workflows/workflows.service'; // [MỚI] Import Service Workflow
 
 type BusyDoc = { bookingRoomKey?: string };
 
@@ -30,6 +31,7 @@ export class RequestsService {
     private readonly priorityClassifier: PriorityClassifierService,
     private readonly mailerService: MailerService,
     private readonly usersService: UsersService,
+    private readonly workflowsService: WorkflowsService, // [MỚI] Inject vào đây
   ) {}
 
   private getCatalogByTypeKey(typeKey: string) {
@@ -37,7 +39,7 @@ export class RequestsService {
   }
 
   // ==================================================================
-  // [NÂNG CẤP] HELPER: TÍNH SỐ NGÀY LÀM VIỆC (TRỪ T7, CN)
+  // HELPER: TÍNH SỐ NGÀY LÀM VIỆC (TRỪ T7, CN)
   // ==================================================================
   private calculateWorkingDays(start: Date, end: Date): number {
     let count = 0;
@@ -53,7 +55,6 @@ export class RequestsService {
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         count++;
       }
-      // Tăng thêm 1 ngày
       cur.setDate(cur.getDate() + 1);
     }
     return count;
@@ -148,7 +149,7 @@ export class RequestsService {
       try { dto.custom = JSON.parse(dto.custom); } catch { dto.custom = {}; }
     }
 
-    // --- [LOGIC MỚI] XỬ LÝ NGHỈ PHÉP (LEAVE REQUEST) ---
+    // --- XỬ LÝ NGHỈ PHÉP (LEAVE REQUEST) ---
     if (dto.typeKey === 'leave_request') {
         const { leaveType, fromDate, toDate } = dto.custom || {};
         
@@ -160,7 +161,6 @@ export class RequestsService {
         const end = new Date(toDate);
         if (start > end) throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
 
-        // [SỬA] Sử dụng hàm tính ngày làm việc (trừ T7, CN)
         const daysRequested = this.calculateWorkingDays(start, end);
         
         if (daysRequested === 0) {
@@ -192,9 +192,22 @@ export class RequestsService {
       }
     }
 
-    const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
-    const approvalsFromCatalog = catalog?.approvalFlow?.map((s) => ({ level: s.level, role: s.role })) || [];
+    // --- [LOGIC MỚI QUAN TRỌNG] Lấy quy trình duyệt (Workflow) ---
+    let approvalsFromCatalog = [];
+
+    // B1: Tìm trong Database (Ưu tiên cấu hình động)
+    const dbWorkflow = await this.workflowsService.findByType(dto.typeKey);
+    
+    if (dbWorkflow && dbWorkflow.steps.length > 0) {
+       approvalsFromCatalog = dbWorkflow.steps.map(s => ({ level: s.level, role: s.role }));
+    } else {
+       // B2: Nếu không có trong DB, lấy từ file cứng (Catalog mặc định)
+       const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
+       approvalsFromCatalog = catalog?.approvalFlow?.map((s) => ({ level: s.level, role: s.role })) || [];
+    }
+
     const hasApproval = approvalsFromCatalog.length > 0;
+    // -------------------------------------------------------------
 
     if (dto?.typeKey === 'meeting_room_booking') {
       const c = dto.custom || {};
@@ -247,7 +260,7 @@ export class RequestsService {
       bookingEnd: dto.bookingEnd,
       requester: new Types.ObjectId(requesterId),
       attachments,
-      approvals: approvalsFromCatalog,
+      approvals: approvalsFromCatalog, // Đã được gán từ DB hoặc Catalog
       currentApprovalLevel: 0,
       approvalStatus: hasApproval ? 'PENDING' : 'NONE',
       assignedTo: null,
@@ -270,6 +283,30 @@ export class RequestsService {
     const [items, total] = await Promise.all([
       this.requestModel.find({ requester: uid }).populate('requester', 'name email').populate('assignedTo', 'name email').sort({ createdAt: -1 }).skip(skip).limit(l).lean().exec(),
       this.requestModel.countDocuments({ requester: uid }),
+    ]);
+    return { items, total, page: p, limit: l };
+  }
+
+  // Lấy danh sách ticket ĐƯỢC GIAO cho user hiện tại
+  async listAssigned(userId: string, page = 1, limit = 10) {
+    const uid = new Types.ObjectId(String(userId));
+    const p = Math.max(1, Math.floor(page));
+    const l = Math.min(200, Math.max(1, Math.floor(limit)));
+    const skip = (p - 1) * l;
+
+    const query = { assignedTo: uid };
+
+    const [items, total] = await Promise.all([
+      this.requestModel
+        .find(query)
+        .populate('requester', 'name email department')
+        .populate('assignedTo', 'name email')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(l)
+        .lean()
+        .exec(),
+      this.requestModel.countDocuments(query),
     ]);
     return { items, total, page: p, limit: l };
   }
@@ -433,15 +470,21 @@ export class RequestsService {
 
     const roles = (user.roles || []).map((r: string) => r.toUpperCase());
     const isManager = roles.includes('ADMIN') || roles.includes('MANAGER') || roles.includes(`${request.category}_MANAGER`);
-    
-    if (status === RequestStatus.COMPLETED || status === RequestStatus.CANCELLED) {
-      if (assigneeIdStr !== currentUserId.toString() && !isManager) {
-        const isRequester = request.requester?.toString() === currentUserId.toString();
-        if (status !== RequestStatus.CANCELLED || !isRequester) {
-           throw new ForbiddenException('Không có quyền cập nhật trạng thái.');
+    const isAssignee = assigneeIdStr === currentUserId.toString();
+    const isRequester = request.requester?.toString() === currentUserId.toString();
+
+    if (!isManager) {
+        if (status === RequestStatus.CANCELLED) {
+            if (!isRequester && !isAssignee) {
+                throw new ForbiddenException('Bạn không có quyền hủy yêu cầu này.');
+            }
+        } else {
+            if (!isAssignee) {
+                throw new ForbiddenException('Bạn không phải người được giao việc nên không thể cập nhật trạng thái.');
+            }
         }
-      }
     }
+
     request.status = status as RequestStatus;
     if (status === RequestStatus.COMPLETED) request.resolvedAt = new Date();
     return request.save();
