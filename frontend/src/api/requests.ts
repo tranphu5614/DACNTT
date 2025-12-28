@@ -37,7 +37,8 @@ export interface MyRequestItem {
   createdAt: string;
   updatedAt: string;
   dueDate?: string; // [New] SLA
-
+  department?: string;
+  
   // Người tạo & Người xử lý
   requester?: UserShort;
   assignedTo?: UserShort;

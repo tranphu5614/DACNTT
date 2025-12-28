@@ -37,12 +37,34 @@ export class RequestsService {
   }
 
   // ==================================================================
+  // [NÂNG CẤP] HELPER: TÍNH SỐ NGÀY LÀM VIỆC (TRỪ T7, CN)
+  // ==================================================================
+  private calculateWorkingDays(start: Date, end: Date): number {
+    let count = 0;
+    const cur = new Date(start); 
+    cur.setHours(0, 0, 0, 0);
+    
+    const last = new Date(end); 
+    last.setHours(0, 0, 0, 0);
+
+    while (cur <= last) {
+      const dayOfWeek = cur.getDay();
+      // 0: Chủ Nhật, 6: Thứ 7 -> Chỉ đếm từ Thứ 2 (1) đến Thứ 6 (5)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        count++;
+      }
+      // Tăng thêm 1 ngày
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
+  // ==================================================================
   // HELPER: GỬI EMAIL THÔNG BÁO
   // ==================================================================
   private async sendNotificationEmail(toUser: any, subject: string, htmlContent: string) {
     try {
       const email = toUser?.email || (typeof toUser === 'string' ? toUser : null);
-      
       if (email) {
         await this.mailerService.sendMail({
           to: email,
@@ -61,7 +83,6 @@ export class RequestsService {
   // ==================================================================
   private async autoAssignTask(category: string): Promise<string | null> {
     const candidates = await this.usersService.findByDepartment(category);
-    
     if (!candidates || candidates.length === 0) {
       this.logger.warn(`Auto-Assign: Không tìm thấy nhân viên nào thuộc phòng ${category}`);
       return null;
@@ -75,13 +96,11 @@ export class RequestsService {
         assignedTo: user._id,
         status: RequestStatus.IN_PROGRESS
       });
-
       if (load < minLoad) {
         minLoad = load;
         selectedUser = user;
       }
     }
-
     return selectedUser ? selectedUser._id.toString() : null;
   }
 
@@ -93,16 +112,11 @@ export class RequestsService {
 
     const startISO = `${dateStr}T${fromStr}:00`;
     const endISO = `${dateStr}T${toStr}:00`;
-
     const start = new Date(startISO);
     const end = new Date(endISO);
 
-    if (isNaN(+start) || isNaN(+end)) {
-      throw new BadRequestException('Thời gian không hợp lệ');
-    }
-    if (end <= start) {
-      throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu');
-    }
+    if (isNaN(+start) || isNaN(+end)) throw new BadRequestException('Thời gian không hợp lệ');
+    if (end <= start) throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu');
 
     const busy = (await this.requestModel
       .find({
@@ -115,10 +129,7 @@ export class RequestsService {
       .lean()
       .exec()) as BusyDoc[];
 
-    const busyKeys = new Set(
-      (busy || []).map((b: BusyDoc) => b.bookingRoomKey).filter(Boolean),
-    );
-
+    const busyKeys = new Set((busy || []).map((b) => b.bookingRoomKey).filter(Boolean));
     return ROOMS
       .filter((r) => r.size === size)
       .map((r) => ({
@@ -132,23 +143,47 @@ export class RequestsService {
   // ==================================================================
   // 2. TẠO REQUEST (CREATE)
   // ==================================================================
-  async createWithRequester(
-    requesterId: string,
-    dto: any,
-    files: Express.Multer.File[] = [],
-  ) {
+  async createWithRequester(requesterId: string, dto: any, files: Express.Multer.File[] = []) {
     if (typeof dto?.custom === 'string') {
-      try {
-        dto.custom = JSON.parse(dto.custom);
-      } catch {
-        dto.custom = {};
-      }
+      try { dto.custom = JSON.parse(dto.custom); } catch { dto.custom = {}; }
     }
+
+    // --- [LOGIC MỚI] XỬ LÝ NGHỈ PHÉP (LEAVE REQUEST) ---
+    if (dto.typeKey === 'leave_request') {
+        const { leaveType, fromDate, toDate } = dto.custom || {};
+        
+        if (!leaveType || !fromDate || !toDate) {
+            throw new BadRequestException('Vui lòng chọn loại nghỉ và thời gian.');
+        }
+
+        const start = new Date(fromDate);
+        const end = new Date(toDate);
+        if (start > end) throw new BadRequestException('Ngày kết thúc phải sau ngày bắt đầu');
+
+        // [SỬA] Sử dụng hàm tính ngày làm việc (trừ T7, CN)
+        const daysRequested = this.calculateWorkingDays(start, end);
+        
+        if (daysRequested === 0) {
+             throw new BadRequestException('Bạn đang chọn toàn ngày nghỉ cuối tuần. Vui lòng kiểm tra lại.');
+        }
+
+        const user: any = await this.usersService.findById(requesterId);
+        const currentBalance = user?.paidLeaveDaysLeft ?? 0;
+
+        if (leaveType === 'PAID') {
+            if (currentBalance < daysRequested) {
+                throw new BadRequestException(
+                    `Bạn chỉ còn ${currentBalance} ngày phép có lương. Không đủ để nghỉ ${daysRequested} ngày làm việc.`
+                );
+            }
+            await this.usersService.updateLeaveDays(requesterId, currentBalance - daysRequested);
+        }
+    }
+    // ----------------------------------------------------
 
     if (!dto.priority) {
       const textParts = [dto.title, dto.description].filter(Boolean);
       const textToAnalyze = textParts.join('. ');
-
       if (textToAnalyze && textToAnalyze.trim().length >= 5) {
         const suggested = await this.priorityClassifier.suggestPriority(textToAnalyze);
         dto.priority = suggested || 'MEDIUM';
@@ -158,12 +193,7 @@ export class RequestsService {
     }
 
     const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
-    const approvalsFromCatalog =
-      catalog?.approvalFlow?.map((s) => ({
-        level: s.level,
-        role: s.role,
-      })) || [];
-
+    const approvalsFromCatalog = catalog?.approvalFlow?.map((s) => ({ level: s.level, role: s.role })) || [];
     const hasApproval = approvalsFromCatalog.length > 0;
 
     if (dto?.typeKey === 'meeting_room_booking') {
@@ -189,20 +219,14 @@ export class RequestsService {
         bookingEnd: { $gt: startDt },
       });
 
-      if (conflict) {
-        throw new ConflictException('Phòng đã bị đặt trong khung giờ này.');
-      }
-
+      if (conflict) throw new ConflictException('Phòng đã bị đặt trong khung giờ này.');
       dto.bookingRoomKey = roomKey;
       dto.bookingStart = startDt;
       dto.bookingEnd = endDt;
     }
 
     const attachments = (files || []).map((f) => ({
-      filename: f.originalname,
-      path: f.filename,
-      size: f.size,
-      mimetype: f.mimetype,
+      filename: f.originalname, path: f.filename, size: f.size, mimetype: f.mimetype,
     }));
 
     let dueDate = new Date();
@@ -244,25 +268,13 @@ export class RequestsService {
     const skip = (p - 1) * l;
 
     const [items, total] = await Promise.all([
-      this.requestModel
-        .find({ requester: uid })
-        .populate('requester', 'name email')
-        .populate('assignedTo', 'name email')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(l)
-        .lean()
-        .exec(),
+      this.requestModel.find({ requester: uid }).populate('requester', 'name email').populate('assignedTo', 'name email').sort({ createdAt: -1 }).skip(skip).limit(l).lean().exec(),
       this.requestModel.countDocuments({ requester: uid }),
     ]);
     return { items, total, page: p, limit: l };
   }
 
-  async listQueue(
-    filter: { category: string; status?: string; priority?: string; q?: string },
-    page = 1,
-    limit = 10,
-  ) {
+  async listQueue(filter: { category: string; status?: string; priority?: string; q?: string }, page = 1, limit = 10) {
     const p = Math.max(1, Math.floor(page));
     const l = Math.min(200, Math.max(1, Math.floor(limit)));
     const skip = (p - 1) * l;
@@ -276,28 +288,14 @@ export class RequestsService {
     }
 
     const [items, total] = await Promise.all([
-      this.requestModel
-        .find(query)
-        .populate('requester', 'name email')
-        .populate('assignedTo', 'name email')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(l)
-        .lean()
-        .exec(),
+      this.requestModel.find(query).populate('requester', 'name email').populate('assignedTo', 'name email').sort({ createdAt: -1 }).skip(skip).limit(l).lean().exec(),
       this.requestModel.countDocuments(query),
     ]);
     return { items, total, page: p, limit: l };
   }
 
   async getById(id: string) {
-    const doc = await this.requestModel
-      .findById(id)
-      .populate('requester', 'name email department phoneNumber')
-      .populate('assignedTo', 'name email')
-      .populate('approvals.approver', 'name email')
-      .populate('comments.author', 'name email')
-      .exec();
+    const doc = await this.requestModel.findById(id).populate('requester', 'name email department phoneNumber').populate('assignedTo', 'name email').populate('approvals.approver', 'name email').populate('comments.author', 'name email').exec();
     if (!doc) throw new NotFoundException('Request not found');
     return doc;
   }
@@ -305,16 +303,9 @@ export class RequestsService {
   async listPendingForApprover(user: { _id: string; roles?: string[] }) {
     const roles = user.roles || [];
     if (!roles.length) return [];
-
-    return this.requestModel
-      .find({
+    return this.requestModel.find({
         approvalStatus: { $in: ['PENDING', 'IN_REVIEW'] },
-        approvals: {
-          $elemMatch: {
-            role: { $in: roles },
-            decision: { $exists: false },
-          },
-        },
+        approvals: { $elemMatch: { role: { $in: roles }, decision: { $exists: false } } },
       })
       .populate('requester', 'name email')
       .sort({ createdAt: -1 })
@@ -328,7 +319,6 @@ export class RequestsService {
   async approve(id: string, user: { _id: string; roles?: string[]; name?: string }, comment?: string) {
     const doc = await this.requestModel.findById(id).populate('requester');
     if (!doc) throw new NotFoundException('Request not found');
-
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');
     }
@@ -354,88 +344,48 @@ export class RequestsService {
     step.approvedAt = new Date();
     step.decision = 'APPROVED';
     step.comment = comment;
-
     doc.currentApprovalLevel = nextLevel;
 
-    const stillHasNext = (doc.approvals || []).some(
-      (a) => a.level > nextLevel && !a.decision,
-    );
+    const stillHasNext = (doc.approvals || []).some((a) => a.level > nextLevel && !a.decision);
     doc.approvalStatus = stillHasNext ? 'IN_REVIEW' : 'APPROVED';
 
-    // --- LOGIC AUTO COMPLETE & AUTO ASSIGN ---
     if (doc.approvalStatus === 'APPROVED') {
         const autoCompleteTypes = ['meeting_room_booking', 'leave_request'];
-        
         if (autoCompleteTypes.includes(doc.typeKey)) {
-            // Loại đơn tự động xong
             doc.status = RequestStatus.COMPLETED;
             doc.resolvedAt = new Date();
         } else {
-            // Loại đơn cần người làm -> Chuyển IN_PROGRESS -> Tìm người làm
             if (doc.status === RequestStatus.NEW || doc.status === RequestStatus.PENDING) {
                 doc.status = RequestStatus.IN_PROGRESS;
-
                 const bestAssigneeId = await this.autoAssignTask(doc.category);
-                
                 if (bestAssigneeId) {
                    doc.assignedTo = new Types.ObjectId(bestAssigneeId);
-                   
-                   // Mail cho nhân viên
                    const assignee = await this.usersService.findById(bestAssigneeId);
-                   this.sendNotificationEmail(
-                      assignee, 
-                      `[Giao việc] Bạn nhận được yêu cầu mới: ${doc.title}`,
-                      `<h3>Hệ thống đã tự động giao việc cho bạn</h3><p>Yêu cầu: ${doc.title}</p>`
-                   );
+                   this.sendNotificationEmail(assignee, `[Giao việc] ${doc.title}`, `<h3>Hệ thống tự động giao việc</h3>`);
                 }
             }
         }
     }
-
     await doc.save();
-
-    // Mail cho người tạo
-    this.sendNotificationEmail(
-      doc.requester,
-      `[Hệ thống] Yêu cầu được duyệt bước ${step.level}: ${doc.title}`,
-      `
-        <h3>Yêu cầu của bạn đã được duyệt bước ${step.level}</h3>
-        <p><strong>Tiêu đề:</strong> ${doc.title}</p>
-        <p><strong>Người duyệt:</strong> ${user.name || 'Quản lý'}</p>
-        <p><strong>Nhận xét:</strong> ${comment || 'Không có'}</p>
-        <hr/>
-        <p>Trạng thái duyệt: <strong>${doc.approvalStatus}</strong></p>
-        <p>Trạng thái xử lý: <strong>${doc.status}</strong></p>
-      `
-    );
-
+    this.sendNotificationEmail(doc.requester, `[Hệ thống] Đã duyệt bước ${step.level}`, `<p>Trạng thái: ${doc.approvalStatus}</p>`);
     return doc;
   }
 
   async reject(id: string, user: { _id: string; roles?: string[]; name?: string }, comment?: string) {
     const doc = await this.requestModel.findById(id).populate('requester');
     if (!doc) throw new NotFoundException('Request not found');
-
     if (doc.approvalStatus === 'APPROVED' || doc.approvalStatus === 'REJECTED') {
       throw new BadRequestException('Request đã kết thúc quy trình duyệt');
     }
 
     const nextLevel = (doc.currentApprovalLevel || 0) + 1;
-    const step =
-      (doc.approvals || []).find((a) => a.level === nextLevel) ||
-      (doc.approvals || []).find((a) => !a.decision);
-
-    if (!step) {
-      throw new BadRequestException('Không tìm thấy bước duyệt để từ chối');
-    }
+    const step = (doc.approvals || []).find((a) => a.level === nextLevel) || (doc.approvals || []).find((a) => !a.decision);
+    if (!step) throw new BadRequestException('Không tìm thấy bước duyệt');
 
     const userRoles = user.roles || [];
     const isAdmin = userRoles.includes('ADMIN');
     const isApproverForStep = userRoles.includes(step.role);
-
-    if (!isAdmin && !isApproverForStep) {
-      throw new ForbiddenException('Bạn không có quyền từ chối bước này');
-    }
+    if (!isAdmin && !isApproverForStep) throw new ForbiddenException('Không có quyền từ chối');
 
     step.approver = new Types.ObjectId(user._id);
     step.approvedAt = new Date();
@@ -444,43 +394,16 @@ export class RequestsService {
 
     doc.approvalStatus = 'REJECTED';
     doc.status = RequestStatus.REJECTED;
-
     await doc.save();
-
-    this.sendNotificationEmail(
-      doc.requester,
-      `[Hệ thống] Yêu cầu bị TỪ CHỐI: ${doc.title}`,
-      `
-        <h3 style="color: red;">Yêu cầu của bạn đã bị từ chối</h3>
-        <p><strong>Tiêu đề:</strong> ${doc.title}</p>
-        <p><strong>Người từ chối:</strong> ${user.name || 'Quản lý'}</p>
-        <p><strong>Lý do:</strong> ${comment || 'Không có'}</p>
-      `
-    );
-
+    this.sendNotificationEmail(doc.requester, `[Hệ thống] Bị TỪ CHỐI`, `<p>Lý do: ${comment}</p>`);
     return doc;
   }
 
   // ==================================================================
   // 5. CÁC HÀM KHÁC
   // ==================================================================
-
   async addComment(id: string, userId: string, content: string, isInternal: boolean) {
-    const request = await this.requestModel.findByIdAndUpdate(
-      id,
-      {
-        $push: {
-          comments: {
-            content,
-            author: new Types.ObjectId(userId),
-            createdAt: new Date(),
-            isInternal
-          }
-        }
-      },
-      { new: true }
-    ).populate('comments.author', 'name email');
-
+    const request = await this.requestModel.findByIdAndUpdate(id, { $push: { comments: { content, author: new Types.ObjectId(userId), createdAt: new Date(), isInternal } } }, { new: true }).populate('comments.author', 'name email');
     if (!request) throw new NotFoundException('Request not found');
     return request;
   }
@@ -488,34 +411,19 @@ export class RequestsService {
   async assignRequest(id: string, assigneeId: string) {
     const doc = await this.requestModel.findById(id);
     if (!doc) throw new NotFoundException('Request not found');
-
-    if (doc.approvalStatus === 'PENDING') {
-      throw new BadRequestException('Yêu cầu này đang chờ duyệt, chưa thể giao việc.');
-    }
-    if (doc.approvalStatus === 'REJECTED') {
-      throw new BadRequestException('Yêu cầu này đã bị từ chối, không thể xử lý.');
-    }
+    if (doc.approvalStatus === 'PENDING') throw new BadRequestException('Đang chờ duyệt');
+    if (doc.approvalStatus === 'REJECTED') throw new BadRequestException('Đã bị từ chối');
 
     doc.assignedTo = new Types.ObjectId(assigneeId);
     doc.status = RequestStatus.IN_PROGRESS; 
     await doc.save();
-    await doc.populate('assignedTo', 'name email');
-    
-    this.logger.log(`Assigned Request ${id} to User ${assigneeId}`);
     return doc;
   }
 
   async updateStatus(id: string, status: string, user: any) {
     const currentUserId = user._id || user.userId || user.sub;
-    if (!currentUserId) {
-      throw new BadRequestException('Không xác định được User ID thực hiện thao tác.');
-    }
-    const currentUserIdStr = currentUserId.toString();
-
     const request = await this.requestModel.findById(id);
-    if (!request) {
-      throw new NotFoundException('Không tìm thấy yêu cầu.');
-    }
+    if (!request) throw new NotFoundException('Không tìm thấy yêu cầu.');
 
     let assigneeIdStr = '';
     if (request.assignedTo) {
@@ -524,63 +432,33 @@ export class RequestsService {
     }
 
     const roles = (user.roles || []).map((r: string) => r.toUpperCase());
-    const isManager = roles.includes('ADMIN') || 
-                      roles.includes('MANAGER') || 
-                      roles.includes(`${request.category}_MANAGER`);
+    const isManager = roles.includes('ADMIN') || roles.includes('MANAGER') || roles.includes(`${request.category}_MANAGER`);
     
     if (status === RequestStatus.COMPLETED || status === RequestStatus.CANCELLED) {
-      if (assigneeIdStr !== currentUserIdStr && !isManager) {
-        const requesterIdStr = request.requester ? request.requester.toString() : '';
-        const isRequester = requesterIdStr === currentUserIdStr;
-
-        if (status === RequestStatus.CANCELLED && isRequester) {
-           // OK
-        } else {
-           throw new ForbiddenException('Bạn không có quyền cập nhật trạng thái này.');
+      if (assigneeIdStr !== currentUserId.toString() && !isManager) {
+        const isRequester = request.requester?.toString() === currentUserId.toString();
+        if (status !== RequestStatus.CANCELLED || !isRequester) {
+           throw new ForbiddenException('Không có quyền cập nhật trạng thái.');
         }
       }
     }
-
     request.status = status as RequestStatus;
-    
-    if (status === RequestStatus.COMPLETED) {
-      request.resolvedAt = new Date();
-    }
-
+    if (status === RequestStatus.COMPLETED) request.resolvedAt = new Date();
     return request.save();
   }
 
   async suggestDescriptions(query: string): Promise<string[]> {
     if (!query || query.trim().length < 2) return [];
     const q = query.trim().toLowerCase();
-    return ERROR_SUGGESTIONS
-      .map((s) => ({
-        text: s,
-        score:
-          s.toLowerCase().includes(q) ? 2 :
-          s.toLowerCase().split(' ').some((w) => q.includes(w)) ? 1 : 0,
-      }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 6)
-      .map((x) => x.text);
+    return ERROR_SUGGESTIONS.map((s) => ({ text: s, score: s.toLowerCase().includes(q) ? 2 : s.toLowerCase().split(' ').some((w) => q.includes(w)) ? 1 : 0 })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 6).map((x) => x.text);
   }
 
   async getDashboardStats(category?: string) {
     const matchStage: any = {};
-    if (category && category !== 'ALL') {
-      matchStage.category = category;
-    }
-
+    if (category && category !== 'ALL') matchStage.category = category;
     const stats = await this.requestModel.aggregate([
       { $match: matchStage },
-      {
-        $facet: {
-          statusCounts: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
-          categoryCounts: [{ $group: { _id: "$category", count: { $sum: 1 } } }],
-          urgentCount: [{ $match: { priority: "URGENT" } }, { $count: "count" }]
-        }
-      }
+      { $facet: { statusCounts: [{ $group: { _id: "$status", count: { $sum: 1 } } }], categoryCounts: [{ $group: { _id: "$category", count: { $sum: 1 } } }], urgentCount: [{ $match: { priority: "URGENT" } }, { $count: "count" }] } }
     ]);
     return stats[0] || {};
   }
@@ -588,7 +466,6 @@ export class RequestsService {
   async exportToExcel() {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Danh sách yêu cầu');
-
     sheet.columns = [
       { header: 'Mã YC', key: '_id', width: 25 },
       { header: 'Tiêu đề', key: 'title', width: 30 },
@@ -596,92 +473,28 @@ export class RequestsService {
       { header: 'Mức độ', key: 'priority', width: 12 },
       { header: 'Trạng thái', key: 'status', width: 15 },
       { header: 'Người tạo', key: 'requester', width: 20 },
-      { header: 'Người xử lý', key: 'assignee', width: 20 },
-      { header: 'Ngày tạo', key: 'createdAt', width: 20 },
-      { header: 'Hạn xử lý', key: 'dueDate', width: 20 },
     ];
-
-    const requests = await this.requestModel
-      .find()
-      .populate('requester', 'name')
-      .populate('assignedTo', 'name')
-      .sort({ createdAt: -1 })
-      .exec();
-
-    requests.forEach((item) => {
-      const req = item as any;
-      sheet.addRow({
-        _id: req._id ? req._id.toString() : '',
-        title: req.title,
-        category: req.category,
-        priority: req.priority,
-        status: req.status,
-        requester: req.requester?.name || '',
-        assignee: req.assignedTo?.name || '',
-        createdAt: req.createdAt ? new Date(req.createdAt).toLocaleString() : '',
-        dueDate: req.dueDate ? new Date(req.dueDate).toLocaleString() : '',
-      });
+    const requests = await this.requestModel.find().populate('requester', 'name').sort({ createdAt: -1 }).exec();
+    requests.forEach((req: any) => {
+      sheet.addRow({ _id: req._id, title: req.title, category: req.category, priority: req.priority, status: req.status, requester: req.requester?.name });
     });
-
-    sheet.getRow(1).font = { bold: true };
     return workbook;
   }
 
-  // ==================================================================
-  // CRON JOB: QUÉT SLA QUÁ HẠN (GỬI 1 LẦN DUY NHẤT)
-  // ==================================================================
   @Cron(CronExpression.EVERY_10_MINUTES)
   async checkSlaBreach() {
-    this.logger.log('🔄 Đang quét SLA...');
     const now = new Date();
-    
-    // Tìm các ticket chưa xong, quá hạn và chưa được đánh dấu đã breach
     const overdueRequests = await this.requestModel.find({
       status: { $nin: ['COMPLETED', 'CANCELLED', 'REJECTED'] }, 
       dueDate: { $lt: now },
-      $or: [
-          { 'custom.isSlaBreached': { $exists: false } },
-          { 'custom.isSlaBreached': false }
-      ]
+      $or: [{ 'custom.isSlaBreached': { $exists: false } }, { 'custom.isSlaBreached': false }]
     }).populate('requester').populate('assignedTo');
 
-    if (overdueRequests.length > 0) {
-      this.logger.warn(`⚠️ Phát hiện ${overdueRequests.length} ticket MỚI vi phạm SLA!`);
-      
-      for (const req of overdueRequests) {
+    for (const req of overdueRequests) {
         req.custom = { ...req.custom, isSlaBreached: true };
-        
-        req.comments.push({
-            content: `⚠️ [CẢNH BÁO] Ticket quá hạn xử lý vào lúc ${now.toLocaleString()}. Email nhắc nhở đã được gửi.`,
-            createdAt: now,
-            isInternal: true,
-            author: null as any
-        });
-
+        req.comments.push({ content: `⚠️ [CẢNH BÁO] Quá hạn xử lý`, createdAt: now, isInternal: true, author: null as any });
         await req.save();
-
-        // [ĐÃ SỬA] Xử lý trường hợp dueDate có thể undefined
-        const dueDateStr = req.dueDate ? new Date(req.dueDate).toLocaleString() : 'Không xác định';
-
-        this.sendNotificationEmail(
-          req.requester,
-          `[⚠️ QUÁ HẠN] Yêu cầu cần chú ý: ${req.title}`,
-          `
-            <h3 style="color: red;">Yêu cầu đã quá hạn xử lý!</h3>
-            <p><strong>Tiêu đề:</strong> ${req.title}</p>
-            <p><strong>Hạn chót:</strong> ${dueDateStr}</p>
-            <p>Vui lòng kiểm tra lại.</p>
-          `
-        );
-
-        if (req.assignedTo) {
-           this.sendNotificationEmail(
-             req.assignedTo,
-             `[⚠️ QUÁ HẠN] Bạn có ticket trễ hạn: ${req.title}`,
-             `<p>Bạn đang phụ trách ticket <strong>"${req.title}"</strong> và nó đã quá hạn. Vui lòng xử lý gấp.</p>`
-           );
-        }
-      }
+        this.sendNotificationEmail(req.requester, `[⚠️ QUÁ HẠN] ${req.title}`, `<p>Ticket đã quá hạn.</p>`);
     }
   }
 }

@@ -17,7 +17,6 @@ export class User {
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   email!: string;
 
-  // [SỬA] Cho phép password null ban đầu (khi Admin tạo invite)
   @Prop({ required: false })
   password?: string;
 
@@ -39,14 +38,15 @@ export class User {
   @Prop({ select: false })
   verificationToken?: string;
 
-  // [MỚI] Token reset mật khẩu (Dùng cho chức năng Quên mật khẩu)
-  // select: false để không trả về token này trong các query thông thường
   @Prop({ select: false })
   resetPasswordToken?: string;
 
-  // [MỚI] Thời gian hết hạn của token reset
   @Prop()
   resetPasswordExpires?: Date;
+
+  // [MỚI] Số ngày nghỉ phép có lương còn lại (Mặc định 12/năm)
+  @Prop({ default: 12 })
+  paidLeaveDaysLeft!: number;
 }
 
 export type UserDocument = User & Document;
