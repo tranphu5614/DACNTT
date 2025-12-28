@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 
 type Variant = 'static' | 'offcanvas';
 
-// Màu sắc chuẩn Odoo Dark Theme
+// Standard Odoo Dark Theme Colors
 const THEME = {
   BG: '#1e2327',           
   ACTIVE_BG: '#2a3036',    
@@ -48,7 +48,7 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
     </div>
   );
 
-  // --- CONTENT (Flex Column để xử lý cuộn nội bộ) ---
+  // --- CONTENT (Flex Column for internal scrolling) ---
   const SidebarContent = () => (
     <div className="d-flex flex-column h-100 text-white">
       
@@ -63,33 +63,33 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
         </div>
       </div>
 
-      {/* 2. MENU LIST (Chỉ vùng này cuộn) */}
+      {/* 2. MENU LIST (Scrolling area) */}
       <div className="flex-grow-1 overflow-y-auto custom-scrollbar py-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#495057 transparent' }}>
         <ul className="nav flex-column mb-0">
           
-          <SectionTitle label="Cá nhân" />
-          <MenuLink to="/dashboard" icon="bi-speedometer2" label="Tổng quan" />
-          <MenuLink to="/requests/new" icon="bi-plus-circle" label="Tạo yêu cầu" />
-          <MenuLink to="/requests/mine" icon="bi-list-task" label="Yêu cầu của tôi" />
-          <MenuLink to="/profile" icon="bi-person-gear" label="Hồ sơ cá nhân" />
+          <SectionTitle label="Personal" />
+          <MenuLink to="/dashboard" icon="bi-speedometer2" label="Overview" />
+          <MenuLink to="/requests/new" icon="bi-plus-circle" label="New Request" />
+          <MenuLink to="/requests/mine" icon="bi-list-task" label="My Requests" />
+          <MenuLink to="/profile" icon="bi-person-gear" label="My Profile" />
 
           {isManager && (
             <>
-              <SectionTitle label="Quản lý" />
-              {(isAdmin || hasRole('HR_MANAGER')) && <MenuLink to="/queue/hr" icon="bi-people" label="Hàng chờ HR" />}
-              {(isAdmin || hasRole('IT_MANAGER')) && <MenuLink to="/queue/it" icon="bi-pc-display" label="Hàng chờ IT" />}
+              <SectionTitle label="Management" />
+              {(isAdmin || hasRole('HR_MANAGER')) && <MenuLink to="/queue/hr" icon="bi-people" label="HR Queue" />}
+              {(isAdmin || hasRole('IT_MANAGER')) && <MenuLink to="/queue/it" icon="bi-pc-display" label="IT Queue" />}
             </>
           )}
 
           {isAdmin && (
             <>
-                <SectionTitle label="Hệ thống" />
-                <MenuLink to="/admin/users" icon="bi-people-fill" label="Nhân viên" />
-                <MenuLink to="/admin/settings" icon="bi-gear-fill" label="Cấu hình" />
+                <SectionTitle label="System" />
+                <MenuLink to="/admin/users" icon="bi-people-fill" label="Employees" />
+                <MenuLink to="/admin/settings" icon="bi-gear-fill" label="Settings" />
             </>
           )}
           
-          {/* Spacer để đảm bảo nội dung cuối không bị che */}
+          {/* Spacer to ensure last item isn't cut off */}
           <div style={{height: 20}}></div> 
         </ul>
       </div>
@@ -108,14 +108,14 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
             </div>
           </a>
           <ul className="dropdown-menu dropdown-menu-dark shadow-lg border-0 mb-2 w-100">
-            <li><NavLink className="dropdown-item small" to="/profile"><i className="bi bi-person me-2"></i>Hồ sơ</NavLink></li>
+            <li><NavLink className="dropdown-item small" to="/profile"><i className="bi bi-person me-2"></i>Profile</NavLink></li>
             <li><hr className="dropdown-divider border-secondary border-opacity-50" /></li>
             <li>
                 <button className="dropdown-item text-danger small" onClick={() => {
                     localStorage.removeItem('token');
                     window.location.href = '/login';
                 }}>
-                    <i className="bi bi-box-arrow-right me-2"></i> Đăng xuất
+                    <i className="bi bi-box-arrow-right me-2"></i> Logout
                 </button>
             </li>
           </ul>
@@ -143,15 +143,15 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
     <aside 
         className="d-none d-lg-block shadow-sm"
         style={{ 
-            position: 'fixed', // QUAN TRỌNG: Cố định vị trí
+            position: 'fixed', // IMPORTANT: Fixed position
             top: 0,
             left: 0,
             bottom: 0,
             width: 260, 
-            height: '100vh', // Chiều cao bằng 100% màn hình
+            height: '100vh', // Height is 100% viewport height
             backgroundColor: THEME.BG,
-            zIndex: 1040, // Đảm bảo nổi trên các thành phần khác nếu cần
-            overflow: 'hidden' // Ẩn thanh cuộn của khung ngoài
+            zIndex: 1040, // Ensure it's above other elements if needed
+            overflow: 'hidden' // Hide scrollbar of outer frame
         }}
     >
       <SidebarContent />

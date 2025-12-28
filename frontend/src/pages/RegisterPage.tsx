@@ -8,12 +8,12 @@ export default function RegisterPage() {
   return (
     <div className="card shadow-sm">
       <div className="card-body">
-        <h4 className="card-title mb-1">Tạo tài khoản</h4>
-        <p className="text-secondary">Self-registration hiện bị vô hiệu hoá</p>
-        <p>Vui lòng liên hệ quản trị viên để được tạo tài khoản.</p>
+        <h4 className="card-title mb-1">Create Account</h4>
+        <p className="text-secondary">Self-registration is currently disabled</p>
+        <p>Please contact an administrator to request an account.</p>
         {token && isAdmin && (
           <p className="mb-0">
-            Bạn là admin? <Link to="/admin/users/create">Tạo user tại đây</Link>.
+            Are you an admin? <Link to="/admin/users/create">Create user here</Link>.
           </p>
         )}
       </div>

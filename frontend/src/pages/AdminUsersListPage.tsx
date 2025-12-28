@@ -42,7 +42,9 @@ export default function AdminUsersListPage() {
   };
 
   const onDelete = async (id: string, email: string) => {
-    if (!token || !confirm(`Xoá nhân viên "${email}"? Hành động này không thể hoàn tác.`)) return;
+    // English confirmation message
+    if (!token || !confirm(`Are you sure you want to delete user "${email}"? This action cannot be undone.`)) return;
+    
     setDeletingId(id);
     try {
       await apiDeleteUser(token, id);
@@ -52,7 +54,8 @@ export default function AdminUsersListPage() {
       }
       await load();
     } catch (e: any) {
-      alert(e?.message || 'Xóa thất bại');
+      // English error message
+      alert(e?.message || 'Delete failed');
     } finally {
       setDeletingId(null);
     }
@@ -67,26 +70,26 @@ export default function AdminUsersListPage() {
   );
 
   return (
-    <div className="d-flex flex-column h-100 bg-white"> {/* Nền trắng toàn bộ */}
+    <div className="d-flex flex-column h-100 bg-white"> {/* Full white background */}
       
-      {/* 1. CONTROL PANEL (Dính liền Header) */}
+      {/* 1. CONTROL PANEL (Sticky Header) */}
       <div className="border-bottom px-3 py-2 d-flex justify-content-between align-items-center bg-white sticky-top" style={{zIndex: 100, height: 56}}>
         
-        {/* Breadcrumb bên trái */}
+        {/* Breadcrumb Left */}
         <div className="d-flex align-items-center gap-3">
-            <h5 className="mb-0 fw-bold text-dark">Nhân viên</h5>
+            <h5 className="mb-0 fw-bold text-dark">Users</h5>
             <div className="vr h-50 mx-1"></div>
-            <span className="text-muted small">Quản lý tài khoản & Phân quyền</span>
+            <span className="text-muted small">Account Management & Permissions</span>
         </div>
 
-        {/* Tools bên phải (Search, Filter, Actions) */}
+        {/* Tools Right (Search, Filter, Actions) */}
         <div className="d-flex gap-2 align-items-center">
             {/* Search */}
             <form onSubmit={handleSearch} className="input-group input-group-sm" style={{ width: 200 }}>
                 <span className="input-group-text bg-light border-end-0 text-muted"><i className="bi bi-search"></i></span>
                 <input 
                     className="form-control bg-light border-start-0 ps-0" 
-                    placeholder="Tìm kiếm..." 
+                    placeholder="Search..." 
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                 />
@@ -94,7 +97,7 @@ export default function AdminUsersListPage() {
 
             {/* Filter Role */}
             <select className="form-select form-select-sm bg-light" style={{width: 130}} value={role} onChange={(e) => setRole(e.target.value)}>
-               <option value="">Tất cả vai trò</option>
+               <option value="">All Roles</option>
                <option value="USER">User</option>
                <option value="ADMIN">Admin</option>
                <option value="IT_MANAGER">IT Manager</option>
@@ -111,7 +114,7 @@ export default function AdminUsersListPage() {
             </div>
 
             <Link to="/admin/users/create" className="btn btn-sm btn-primary fw-bold text-nowrap shadow-sm ms-2" style={{ backgroundColor: '#008784', borderColor: '#008784' }}>
-               <i className="bi bi-plus-lg me-1"></i> Tạo mới
+               <i className="bi bi-plus-lg me-1"></i> Create New
             </Link>
         </div>
       </div>
@@ -121,23 +124,23 @@ export default function AdminUsersListPage() {
         <table className="table table-hover mb-0 align-middle text-nowrap w-100">
             <thead className="bg-light sticky-top" style={{top: 0, zIndex: 5}}>
                 <tr>
-                    <th className="border-bottom py-2 ps-3 text-secondary small fw-bold text-uppercase" style={{width: '250px'}}>Nhân viên</th>
+                    <th className="border-bottom py-2 ps-3 text-secondary small fw-bold text-uppercase" style={{width: '250px'}}>User</th>
                     <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Email</th>
-                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Phòng ban</th>
-                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Vai trò</th>
-                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Trạng thái</th>
-                    <th className="border-bottom py-2 pe-3 text-secondary small fw-bold text-uppercase text-end">Thao tác</th>
+                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Department</th>
+                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Role</th>
+                    <th className="border-bottom py-2 text-secondary small fw-bold text-uppercase">Status</th>
+                    <th className="border-bottom py-2 pe-3 text-secondary small fw-bold text-uppercase text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {loading && items.length === 0 && (
-                    <tr><td colSpan={6} className="text-center py-5 text-muted">Đang tải dữ liệu...</td></tr>
+                    <tr><td colSpan={6} className="text-center py-5 text-muted">Loading data...</td></tr>
                 )}
                 {!loading && items.length === 0 && (
                     <tr>
                         <td colSpan={6} className="text-center py-5 text-muted">
                             <i className="bi bi-people fs-1 d-block mb-2 opacity-50"></i>
-                            Không tìm thấy nhân viên nào
+                            No users found
                         </td>
                     </tr>
                 )}
@@ -171,21 +174,21 @@ export default function AdminUsersListPage() {
                             ))}
                         </td>
                         <td className="py-2">
-                             {/* Giả lập status */}
+                             {/* Simulated status */}
                              <span className="badge bg-success-subtle text-success border border-success-subtle fw-normal rounded-pill">
                                  Active
                              </span>
                         </td>
                         <td className="text-end pe-3 py-2">
                             <div className="btn-group">
-                                <Link to={`/admin/users/${u._id}`} className="btn btn-sm btn-light text-muted border-0 hover-bg-gray" title="Chỉnh sửa">
+                                <Link to={`/admin/users/${u._id}`} className="btn btn-sm btn-light text-muted border-0 hover-bg-gray" title="Edit">
                                     <i className="bi bi-pencil"></i>
                                 </Link>
                                 <button 
                                     className="btn btn-sm btn-light text-danger border-0 hover-bg-gray" 
                                     onClick={() => onDelete(u._id, u.email)}
                                     disabled={deletingId === u._id}
-                                    title="Xóa"
+                                    title="Delete"
                                 >
                                     {deletingId === u._id ? <span className="spinner-border spinner-border-sm" style={{width: '0.8rem', height: '0.8rem'}}></span> : <i className="bi bi-trash"></i>}
                                 </button>
@@ -197,10 +200,10 @@ export default function AdminUsersListPage() {
         </table>
       </div>
 
-      {/* 3. FOOTER INFO (Optional) */}
+      {/* 3. FOOTER INFO */}
       <div className="border-top px-3 py-1 bg-light d-flex justify-content-between align-items-center" style={{fontSize: '0.75rem'}}>
-         <div className="text-muted">Tổng: <strong>{total}</strong> bản ghi</div>
-         <div className="text-muted">Đang hiển thị {items.length} kết quả</div>
+         <div className="text-muted">Total: <strong>{total}</strong> records</div>
+         <div className="text-muted">Showing {items.length} results</div>
       </div>
 
     </div>

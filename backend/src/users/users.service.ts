@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException, // [MỚI] Thêm exception này
+  UnauthorizedException, 
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
@@ -25,6 +25,18 @@ export class UsersService {
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
   ) {}
+
+  // =================================================================
+  // [MỚI] HÀM CẬP NHẬT SỐ NGÀY PHÉP (Dùng cho RequestsService gọi)
+  // =================================================================
+  async updateLeaveDays(userId: string, newBalance: number) {
+    if (!Types.ObjectId.isValid(userId)) return null;
+    return this.userModel.findByIdAndUpdate(
+      userId, 
+      { paidLeaveDaysLeft: newBalance }, 
+      { new: true }
+    ).exec();
+  }
 
   // =================================================================
   // 1. PUBLIC & AUTH METHODS
@@ -58,7 +70,8 @@ export class UsersService {
       phoneNumber: dto.phoneNumber,
       roles,
       isVerified: false, 
-      verificationToken, 
+      verificationToken,
+      paidLeaveDaysLeft: 12, // [MỚI] Mặc định có 12 ngày phép khi tạo mới
     });
 
     // 3. Gửi email mời kích hoạt

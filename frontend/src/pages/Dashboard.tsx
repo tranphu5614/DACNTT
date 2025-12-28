@@ -54,7 +54,7 @@ export default function Dashboard() {
       a.click();
       a.remove();
     } catch (e) {
-      alert('Lỗi xuất dữ liệu. Vui lòng thử lại sau.');
+      alert('Error exporting data. Please try again later.');
     }
   };
 
@@ -77,11 +77,11 @@ export default function Dashboard() {
     const statusData = stats.statusCounts || [];
     
     const statusMap: Record<string, { label: string, color: string }> = {
-        'NEW': { label: 'Mới', color: '#6c757d' }, 
-        'PENDING': { label: 'Chờ duyệt', color: '#ffc107' }, 
-        'IN_PROGRESS': { label: 'Đang xử lý', color: '#0d6efd' }, 
-        'COMPLETED': { label: 'Hoàn thành', color: '#198754' }, 
-        'CANCELLED': { label: 'Đã hủy', color: '#dc3545' } 
+        'NEW': { label: 'New', color: '#6c757d' }, 
+        'PENDING': { label: 'Pending Approval', color: '#ffc107' }, 
+        'IN_PROGRESS': { label: 'In Progress', color: '#0d6efd' }, 
+        'COMPLETED': { label: 'Completed', color: '#198754' }, 
+        'CANCELLED': { label: 'Cancelled', color: '#dc3545' } 
     };
 
     const labels = Object.keys(statusMap);
@@ -94,7 +94,7 @@ export default function Dashboard() {
       data: {
         labels: labels.map(k => statusMap[k].label),
         datasets: [{
-          label: 'Số lượng',
+          label: 'Count',
           data: dataValues,
           backgroundColor: labels.map(k => statusMap[k].color),
           borderColor: '#ffffff',
@@ -116,7 +116,7 @@ export default function Dashboard() {
   // --- COMPONENT: KPI CARD (Flat Design) ---
   const KpiCard = ({ title, value, icon, color, subtext }: any) => (
       <div className="col-md-6 col-lg-3">
-          {/* Dùng border thay vì shadow để dính liền nền */}
+          {/* Using border instead of shadow for flat look */}
           <div className="card border h-100 rounded-3 bg-white"> 
               <div className="card-body d-flex align-items-center p-3">
                   <div className={`rounded-circle p-3 me-3 bg-${color}-subtle text-${color} d-flex align-items-center justify-content-center`} style={{width: 52, height: 52}}>
@@ -140,9 +140,9 @@ export default function Dashboard() {
         
         {/* Left: Title */}
         <div className="d-flex align-items-center gap-3">
-           <h6 className="fw-bold text-dark m-0">TỔNG QUAN</h6>
+           <h6 className="fw-bold text-dark m-0">OVERVIEW</h6>
            <div className="vr h-50"></div>
-           <span className="text-muted small">Xin chào, <strong>{user?.name}</strong></span>
+           <span className="text-muted small">Hello, <strong>{user?.name}</strong></span>
         </div>
 
         {/* Right: Tools */}
@@ -155,9 +155,9 @@ export default function Dashboard() {
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 style={{maxWidth: 130, cursor: 'pointer'}}
             >
-                <option value="ALL">Toàn bộ</option>
+                <option value="ALL">All Categories</option>
                 <option value="IT">IT Support</option>
-                <option value="HR">Nhân sự</option>
+                <option value="HR">Human Resources</option>
             </select>
 
             <div className="vr h-50 mx-1"></div>
@@ -166,20 +166,20 @@ export default function Dashboard() {
             <div className="btn-group btn-group-sm bg-light rounded p-0" role="group">
                 <button 
                     className={`btn btn-sm border-0 rounded ${chartType === 'DOUGHNUT' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`} 
-                    onClick={() => setChartType('DOUGHNUT')} title="Tròn"
+                    onClick={() => setChartType('DOUGHNUT')} title="Pie Chart"
                 >
                     <i className="bi bi-pie-chart-fill"></i>
                 </button>
                 <button 
                     className={`btn btn-sm border-0 rounded ${chartType === 'BAR' ? 'bg-white shadow-sm text-primary' : 'text-muted'}`} 
-                    onClick={() => setChartType('BAR')} title="Cột"
+                    onClick={() => setChartType('BAR')} title="Bar Chart"
                 >
                     <i className="bi bi-bar-chart-fill"></i>
                 </button>
             </div>
 
             <button className="btn btn-sm btn-success fw-bold ms-2 shadow-sm" onClick={handleExport}>
-                <i className="bi bi-file-earmark-arrow-down me-1"></i> Xuất
+                <i className="bi bi-file-earmark-arrow-down me-1"></i> Export
             </button>
         </div>
       </div>
@@ -187,38 +187,38 @@ export default function Dashboard() {
       {/* 2. MAIN CONTENT - Full White Canvas */}
       <div className="flex-grow-1 overflow-y-auto">
         
-        {/* Container fluid, padding vừa phải, nền trắng hoàn toàn */}
+        {/* Container fluid, moderate padding, full white background */}
         <div className="container-fluid p-4" style={{maxWidth: 1600}}>
             
             {/* KPI ROW */}
             <div className="row g-3 mb-4">
                 <KpiCard 
-                    title="Tổng yêu cầu" 
+                    title="Total Requests" 
                     value={kpiData.total} 
                     icon="bi-layers-fill" 
                     color="primary" 
-                    subtext="Tất cả thời gian"
+                    subtext="All time"
                 />
                 <KpiCard 
-                    title="Cần xử lý" 
+                    title="Pending Action" 
                     value={kpiData.pending} 
                     icon="bi-hourglass-split" 
                     color="warning" 
-                    subtext="Đang chờ duyệt"
+                    subtext="Awaiting approval"
                 />
                 <KpiCard 
-                    title="Đang thực hiện" 
+                    title="In Progress" 
                     value={kpiData.progress} 
                     icon="bi-gear-wide-connected" 
                     color="info" 
-                    subtext="Tiến độ công việc"
+                    subtext="Work progress"
                 />
                 <KpiCard 
-                    title="Khẩn cấp" 
+                    title="Urgent" 
                     value={kpiData.urgent} 
                     icon="bi-exclamation-triangle-fill" 
                     color="danger" 
-                    subtext="Ưu tiên cao"
+                    subtext="High priority"
                 />
             </div>
 
@@ -227,10 +227,10 @@ export default function Dashboard() {
                 
                 {/* Left: Chart */}
                 <div className="col-lg-7 col-xl-8">
-                    {/* Dùng border thay vì shadow */}
+                    {/* Using border instead of shadow */}
                     <div className="card border h-100 rounded-3">
                         <div className="card-header bg-white border-bottom py-3">
-                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-pie-chart me-2 text-primary"></i>Phân tích trạng thái</h6>
+                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-pie-chart me-2 text-primary"></i>Status Analysis</h6>
                         </div>
                         <div className="card-body" style={{height: 400}}>
                             {loading ? (
@@ -244,7 +244,7 @@ export default function Dashboard() {
                                     {chartType === 'PIE' && <Pie data={chartConfig.data} options={chartConfig.options} />}
                                 </div>
                             ) : (
-                                <div className="d-flex align-items-center justify-content-center h-100 text-muted">Chưa có dữ liệu</div>
+                                <div className="d-flex align-items-center justify-content-center h-100 text-muted">No data available</div>
                             )}
                         </div>
                     </div>
@@ -254,15 +254,15 @@ export default function Dashboard() {
                 <div className="col-lg-5 col-xl-4">
                     <div className="card border h-100 rounded-3">
                         <div className="card-header bg-white border-bottom py-3">
-                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-table me-2 text-success"></i>Chi tiết số liệu</h6>
+                            <h6 className="fw-bold text-dark m-0 small text-uppercase"><i className="bi bi-table me-2 text-success"></i>Data Details</h6>
                         </div>
                         <div className="card-body p-0">
                             <div className="table-responsive">
                                 <table className="table table-hover align-middle mb-0">
                                     <thead className="bg-light border-bottom">
                                         <tr>
-                                            <th className="ps-4 small text-muted text-uppercase fw-bold py-3">Trạng thái</th>
-                                            <th className="text-end small text-muted text-uppercase fw-bold py-3">SL</th>
+                                            <th className="ps-4 small text-muted text-uppercase fw-bold py-3">Status</th>
+                                            <th className="text-end small text-muted text-uppercase fw-bold py-3">Qty</th>
                                             <th className="text-end pe-4 small text-muted text-uppercase fw-bold py-3">%</th>
                                         </tr>
                                     </thead>
@@ -287,7 +287,7 @@ export default function Dashboard() {
                                             )
                                         })}
                                         {(!stats?.statusCounts || stats.statusCounts.length === 0) && (
-                                            <tr><td colSpan={3} className="text-center py-5 text-muted small">Không có dữ liệu</td></tr>
+                                            <tr><td colSpan={3} className="text-center py-5 text-muted small">No data available</td></tr>
                                         )}
                                     </tbody>
                                 </table>

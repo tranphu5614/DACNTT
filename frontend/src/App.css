@@ -199,3 +199,148 @@ body {
     background: rgba(255,255,255,0.2); 
     border-radius: 4px;
 }
+
+/* =========================================
+   MEETING ROOM SELECTOR UI
+   ========================================= */
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.room-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 80px;
+  padding: 1rem;
+  background-color: #fff;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  text-align: left;
+  transition: all 0.2s ease-in-out;
+  overflow: hidden;
+}
+
+.room-card:not(:disabled):hover {
+  border-color: #adb5bd;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.room-card.selected {
+  border-color: var(--odoo-primary); /* Dùng màu chủ đạo Odoo */
+  background-color: #e0f2f1; /* Màu xanh rất nhạt của Teal */
+  box-shadow: 0 4px 12px rgba(0, 135, 132, 0.2);
+}
+
+.room-card.busy {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+.room-icon {
+  font-size: 1.8rem;
+  opacity: 0.7;
+}
+
+.room-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #343a40;
+}
+.room-card.selected .room-name {
+  color: var(--odoo-primary-dark);
+}
+
+.room-status-available {
+  color: #198754;
+  font-weight: 500;
+}
+
+.room-busy-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(233, 236, 239, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.room-busy-overlay span {
+  background-color: #dc3545;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.room-check-mark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background-color: var(--odoo-primary);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 135, 132, 0.3);
+}
+
+/* =========================================
+   CUSTOM DATE INPUT (DD/MM/YYYY) - FIXED
+   ========================================= */
+
+.custom-date-input {
+  position: relative;
+}
+
+/* TRƯỜNG HỢP 1: Khi đã có ngày (data-date không rỗng) VÀ không đang focus
+   -> Ẩn text mặc định của input đi (dùng !important để ép trình duyệt) */
+.custom-date-input:not(:focus):not([data-date=""])::-webkit-datetime-edit {
+  color: transparent !important;
+}
+
+.custom-date-input:not(:focus):not([data-date=""]) {
+  color: transparent !important;
+}
+
+/* TRƯỜNG HỢP 2: Vẽ text dd/mm/yyyy đè lên trên 
+   Chỉ hiện khi có dữ liệu và không focus */
+.custom-date-input:not(:focus):not([data-date=""])::before {
+  content: attr(data-date);
+  position: absolute;
+  left: 12px; /* Căn chỉnh trùng với padding-left của Bootstrap form-control */
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; /* Để click xuyên qua vào input thật */
+  color: #212529; /* Màu chữ đen chuẩn Bootstrap */
+  background-color: #fff; /* Nền trắng che text cũ nếu bị lộ */
+  padding-right: 5px;
+  display: block;
+}
+
+/* Đảm bảo icon lịch luôn hiện rõ và bấm được */
+.custom-date-input::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  z-index: 10;
+  cursor: pointer;
+  background-color: white; /* Che phần text bị tràn nếu có */
+  margin-left: 5px;
+}

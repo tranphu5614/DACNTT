@@ -4,14 +4,14 @@ import { useAuth } from '../context/AuthContext';
 
 type Message = { role: 'user' | 'model'; text: string };
 
-const THEME_COLOR = '#008784'; // Màu Teal chủ đạo của Odoo
+const THEME_COLOR = '#008784'; // Main Teal color for Odoo theme
 
 export default function Chatbot() {
   const { token } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', text: 'Xin chào! Tôi là trợ lý ảo AI hỗ trợ nội bộ. Tôi có thể giúp gì cho bạn về các thủ tục HR hoặc sự cố IT?' }
+    { role: 'model', text: 'Hello! I am your AI Virtual Assistant. How can I help you with HR procedures or IT support today?' }
   ]);
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -37,7 +37,7 @@ export default function Chatbot() {
       const res = await apiChat(token, history, userMsg);
       setMessages(prev => [...prev, { role: 'model', text: res.reply }]);
     } catch (e) {
-      setMessages(prev => [...prev, { role: 'model', text: '⚠️ Hệ thống đang bận, vui lòng thử lại sau.' }]);
+      setMessages(prev => [...prev, { role: 'model', text: '⚠️ System is busy, please try again later.' }]);
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function Chatbot() {
           className="btn rounded-circle shadow d-flex align-items-center justify-content-center text-white position-relative hover-scale"
           style={{ width: 56, height: 56, border: 'none', backgroundColor: THEME_COLOR, transition: 'transform 0.2s' }}
           onClick={() => setIsOpen(true)}
-          title="Trợ lý ảo AI"
+          title="AI Assistant"
         >
           <i className="bi bi-chat-dots-fill fs-3"></i>
           {/* Notification Dot (Optional) */}
@@ -77,15 +77,15 @@ export default function Chatbot() {
                   <i className="bi bi-robot fs-5"></i>
               </div>
               <div>
-                  <div className="fw-bold lh-1" style={{fontSize: '0.95rem'}}>Trợ lý ảo</div>
-                  <small className="text-white-50" style={{fontSize: '0.7rem'}}>Luôn sẵn sàng hỗ trợ</small>
+                  <div className="fw-bold lh-1" style={{fontSize: '0.95rem'}}>AI Assistant</div>
+                  <small className="text-white-50" style={{fontSize: '0.7rem'}}>Always here to help</small>
               </div>
             </div>
             <div className="d-flex gap-2">
-                <button className="btn btn-sm text-white-50 hover-text-white p-0" onClick={() => setIsOpen(false)} title="Thu nhỏ">
+                <button className="btn btn-sm text-white-50 hover-text-white p-0" onClick={() => setIsOpen(false)} title="Minimize">
                     <i className="bi bi-dash-lg"></i>
                 </button>
-                <button className="btn btn-sm text-white-50 hover-text-white p-0 ms-2" onClick={() => setIsOpen(false)} title="Đóng">
+                <button className="btn btn-sm text-white-50 hover-text-white p-0 ms-2" onClick={() => setIsOpen(false)} title="Close">
                     <i className="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -97,7 +97,7 @@ export default function Chatbot() {
             {/* Disclaimer */}
             <div className="text-center mb-4 mt-2">
                 <span className="badge bg-secondary-subtle text-secondary fw-normal border" style={{fontSize: '0.65rem'}}>
-                    AI có thể mắc lỗi. Vui lòng kiểm tra thông tin quan trọng.
+                    AI can make mistakes. Please verify important information.
                 </span>
             </div>
 
@@ -149,7 +149,7 @@ export default function Chatbot() {
             <div className="input-group">
               <input 
                 className="form-control border-0 bg-light rounded-pill px-3 me-2" 
-                placeholder="Nhập câu hỏi của bạn..." 
+                placeholder="Type your question..." 
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -162,7 +162,7 @@ export default function Chatbot() {
                 disabled={loading || !input.trim()}
                 style={{width: 40, height: 40, backgroundColor: THEME_COLOR, opacity: (!input.trim() || loading) ? 0.7 : 1}}
               >
-                 <i className="bi bi-send-fill fs-6 ps-1"></i>
+                  <i className="bi bi-send-fill fs-6 ps-1"></i>
               </button>
             </div>
             <div className="text-center mt-1">

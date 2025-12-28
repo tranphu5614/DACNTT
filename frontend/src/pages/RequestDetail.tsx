@@ -14,6 +14,27 @@ import { apiGetStaffsByDept, UserItem } from '../api/users';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+// --- HELPER FUNCTIONS (Format dữ liệu cho đẹp) ---
+const formatDate = (dateString: string | Date) => {
+  if (!dateString) return '-';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+};
+
+const formatLabel = (str: string) => {
+  if (!str) return '';
+  // Chuyển 'some_variable_name' thành 'Some Variable Name'
+  return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+const getAvatarColor = (name: string) => {
+  const colors = ['bg-primary', 'bg-success', 'bg-danger', 'bg-warning text-dark', 'bg-info text-dark', 'bg-purple'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function RequestDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -39,7 +60,7 @@ export default function RequestDetail() {
             .catch(() => {});
       }
     } catch (err: any) {
-      alert(err.message || 'Không tải được dữ liệu');
+      alert(err.message || 'Failed to load data');
       navigate('/dashboard');
     } finally {
       setLoading(false);
@@ -59,7 +80,7 @@ export default function RequestDetail() {
       id: c._id,
       type: 'comment',
       author: c.author?.name || 'Unknown',
-      avatar: c.author?.name?.[0],
+      avatar: c.author?.name?.[0] || '?', // Lấy chữ cái đầu
       date: new Date(c.createdAt),
       content: c.content,
       isInternal: c.isInternal,
@@ -87,7 +108,7 @@ export default function RequestDetail() {
       await actionFn();
       await loadData(); 
     } catch (e: any) {
-      alert(e.message || 'Lỗi thực hiện hành động');
+      alert(e.message || 'Action failed');
     }
   };
 
@@ -115,199 +136,251 @@ export default function RequestDetail() {
 
   // ================= RENDER =================
   return (
-    <div className="d-flex flex-column h-100 bg-white">
+    <div className="d-flex flex-column h-100 bg-white font-sans">
       
-      {/* 1. HEADER (CONTROL PANEL) */}
-      <div className="border-bottom px-3 py-2 d-flex justify-content-between align-items-center bg-white sticky-top" style={{zIndex: 100, height: 50}}> {/* Giảm height header */}
+      {/* 1. HEADER (CONTROL PANEL) - Giữ nguyên logic cũ, chỉ chỉnh nhẹ padding */}
+      <div className="border-bottom px-4 py-2 d-flex justify-content-between align-items-center bg-white sticky-top shadow-sm" style={{zIndex: 100, height: 60}}>
         
         <div className="d-flex gap-2 align-items-center">
-            <button className="btn btn-sm btn-light border rounded-circle d-flex align-items-center justify-content-center me-2" style={{width: 30, height: 30}} onClick={() => navigate(-1)} title="Quay lại">
+            <button className="btn btn-light border rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: 32, height: 32}} onClick={() => navigate(-1)} title="Back">
                 <i className="bi bi-arrow-left"></i>
             </button>
             
-            {/* Actions */}
+            {/* Actions Buttons */}
             {isManager && data.approvalStatus === 'PENDING' && (
                 <>
-                    <button className="btn btn-sm btn-primary fw-bold px-3" onClick={() => handleAction(() => apiApproveRequest(token!, id!, 'Approved'), 'Duyệt yêu cầu?')}>
-                        <i className="bi bi-check-lg me-1"></i> DUYỆT
+                    <button className="btn btn-sm btn-success fw-semibold px-3 d-flex align-items-center" onClick={() => handleAction(() => apiApproveRequest(token!, id!, 'Approved'), 'Approve request?')}>
+                        <i className="bi bi-check-lg me-2"></i> Approve
                     </button>
                     <button className="btn btn-sm btn-outline-danger px-3" onClick={() => {
-                        const r = prompt('Lý do từ chối?');
+                        const r = prompt('Reason for rejection?');
                         if(r) handleAction(() => apiRejectRequest(token!, id!, r));
                     }}>
-                        TỪ CHỐI
+                        Reject
                     </button>
                 </>
             )}
 
             {canChangeState && (
                 <>
-                    {data.status === 'NEW' && <button className="btn btn-sm btn-primary" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'IN_PROGRESS'))}>Bắt đầu</button>}
+                    {data.status === 'NEW' && <button className="btn btn-sm btn-primary px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'IN_PROGRESS'))}>Start Progress</button>}
                     {data.status === 'IN_PROGRESS' && (
                         <>
-                             <button className="btn btn-sm btn-success text-white" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'COMPLETED'), 'Hoàn thành?')}>Hoàn thành</button>
-                             <button className="btn btn-sm btn-light border" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'PENDING'))}>Tạm hoãn</button>
+                             <button className="btn btn-sm btn-success text-white px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'COMPLETED'), 'Mark as Completed?')}>Mark Done</button>
+                             <button className="btn btn-sm btn-warning text-dark border px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'PENDING'))}>On Hold</button>
                         </>
                     )}
-                    {data.status === 'PENDING' && <button className="btn btn-sm btn-primary" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'IN_PROGRESS'))}>Tiếp tục</button>}
+                    {data.status === 'PENDING' && <button className="btn btn-sm btn-primary px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'IN_PROGRESS'))}>Resume</button>}
                 </>
             )}
 
             {data.status !== 'COMPLETED' && data.status !== 'CANCELLED' && data.approvalStatus !== 'APPROVED' && data.approvalStatus !== 'REJECTED' && (
-                 <button className="btn btn-sm btn-light border text-muted" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'CANCELLED'), 'Hủy yêu cầu?')}>Hủy</button>
+                 <button className="btn btn-sm btn-light border text-muted px-3" onClick={() => handleAction(() => apiUpdateStatus(token!, id!, 'CANCELLED'), 'Cancel request?')}>Cancel</button>
             )}
         </div>
 
         <div className="d-none d-md-block text-end">
-            <div className="fw-bold text-dark small">{data.category} REQUEST</div>
-            <div className="text-muted font-monospace" style={{fontSize: '0.7rem'}}>{data._id}</div>
+            <div className="fw-bold text-dark" style={{fontSize: '0.9rem'}}>{data.category} REQUEST</div>
+            <div className="text-muted font-monospace small">#{data._id.slice(-6).toUpperCase()}</div>
         </div>
       </div>
 
       {/* 2. BODY - Split View */}
-      <div className="flex-grow-1 overflow-hidden d-flex">
+      <div className="flex-grow-1 overflow-hidden d-flex bg-light">
          
-         {/* --- LEFT COLUMN: MAIN CONTENT --- */}
+         {/* --- LEFT COLUMN: MAIN CONTENT (Phần được thay đổi nhiều nhất) --- */}
          <div className="flex-grow-1 overflow-y-auto custom-scrollbar">
              
-             {/* Status Bar */}
-             <div className="border-bottom px-3 py-2 bg-white sticky-top d-flex justify-content-end align-items-center" style={{top: 0, zIndex: 90}}>
-                {data.status === 'CANCELLED' ? <span className="badge bg-danger">ĐÃ HỦY</span> : 
-                 data.approvalStatus === 'REJECTED' && isSimpleWorkflow ? <span className="badge bg-danger">ĐÃ TỪ CHỐI</span> : (
-                    <div className="d-flex border rounded overflow-hidden">
-                        {pipelineSteps.map((step) => (
-                            <div key={step} className={`px-3 py-1 small fw-bold d-flex align-items-center ${step === currentStep ? 'bg-primary text-white' : 'bg-light text-muted border-end'}`}>
-                                {step === 'WAITING_APPROVAL' ? 'CHỜ DUYỆT' : step === 'APPROVED' ? 'ĐÃ DUYỆT' : step === 'DRAFT' ? 'MỚI' : step}
+             {/* Status Pipeline Bar */}
+             <div className="border-bottom px-4 py-3 bg-white d-flex justify-content-between align-items-center mb-3 shadow-sm">
+                <div>
+                     <span className={`badge rounded-pill px-3 py-2 ${data.priority === 'URGENT' ? 'bg-danger' : data.priority === 'HIGH' ? 'bg-warning text-dark' : 'bg-secondary'}`}>
+                        {data.priority} PRIORITY
+                     </span>
+                </div>
+                
+                {data.status === 'CANCELLED' ? <span className="badge bg-secondary fs-6">CANCELLED</span> : 
+                 data.approvalStatus === 'REJECTED' && isSimpleWorkflow ? <span className="badge bg-danger fs-6">REJECTED</span> : (
+                    <div className="d-flex align-items-center">
+                        {pipelineSteps.map((step, idx) => (
+                            <div key={step} className="d-flex align-items-center">
+                                <div className={`d-flex align-items-center justify-content-center rounded-circle small fw-bold border ${step === currentStep ? 'bg-primary text-white border-primary' : 'bg-white text-muted'}`} style={{width: 24, height: 24}}>
+                                    {idx + 1}
+                                </div>
+                                <span className={`ms-2 small fw-bold ${step === currentStep ? 'text-primary' : 'text-muted'}`}>
+                                    {formatLabel(step === 'WAITING_APPROVAL' ? 'WAITING' : step)}
+                                </span>
+                                {idx < pipelineSteps.length - 1 && <div className="mx-2 bg-secondary opacity-25" style={{width: 30, height: 2}}></div>}
                             </div>
                         ))}
                     </div>
                 )}
              </div>
 
-             {/* Detail Form - Đã giảm padding p-5 -> p-4 */}
-             <div className="p-4" style={{maxWidth: 1000, margin: '0 auto'}}>
+             {/* Document Paper Effect */}
+             <div className="px-5 py-4 mx-auto bg-white rounded shadow-sm border" style={{maxWidth: 1000, minHeight: '80vh', marginTop: -10}}>
                 
-                {/* Title Area - Đã giảm margin mb-5 -> mb-3 */}
-                <div className="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <h3 className="fw-bold text-dark mb-1">{data.title}</h3>
-                        {data.bookingRoomKey && (
-                            <span className="badge bg-purple-subtle text-purple border border-purple px-2 py-1">
-                                <i className="bi bi-geo-alt-fill me-1"></i> {data.bookingRoomKey}
-                            </span>
+                {/* Header Title */}
+                <div className="mb-4 pb-3 border-bottom">
+                    <h2 className="fw-bold text-dark mb-2">{data.title}</h2>
+                    <div className="d-flex gap-4 text-muted small">
+                         <span><i className="bi bi-calendar3 me-1"></i> Created: {formatDate(data.createdAt)}</span>
+                         <span><i className="bi bi-person me-1"></i> By: <span className="text-dark fw-semibold">{data.requester?.name}</span></span>
+                         {data.bookingRoomKey && (
+                            <span className="text-purple fw-bold"><i className="bi bi-geo-alt-fill me-1"></i> Room: {data.bookingRoomKey}</span>
                         )}
                     </div>
-                    <div className={`d-flex flex-column align-items-center border rounded px-3 py-1 ${data.priority === 'URGENT' ? 'bg-danger-subtle text-danger border-danger' : 'bg-light text-muted'}`}>
-                         <i className="bi bi-flag-fill fs-5 mb-0"></i>
-                         <small className="fw-bold" style={{fontSize: '0.6rem'}}>{data.priority}</small>
-                    </div>
                 </div>
 
-                {/* Info Grid - Đã giảm row g-5 -> g-4 và mb-5 -> mb-4 */}
-                <div className="row g-4 mb-4">
+                {/* Info Grid (Thay thế Table cũ) */}
+                <div className="row g-4 mb-5">
+                    {/* Cột 1: Thông tin cơ bản */}
                     <div className="col-md-6">
-                        <table className="table table-borderless table-sm m-0">
-                            <tbody>
-                                <tr><td className="text-muted w-25">Người tạo:</td><td className="fw-bold">{data.requester?.name}</td></tr>
-                                <tr><td className="text-muted">Email:</td><td>{data.requester?.email}</td></tr>
-                                <tr><td className="text-muted">Ngày tạo:</td><td>{new Date(data.createdAt).toLocaleString()}</td></tr>
-                            </tbody>
-                        </table>
+                        <h6 className="text-uppercase text-secondary small fw-bold mb-3 ls-1 border-bottom pb-2">Request Info</h6>
+                        <div className="d-flex justify-content-between mb-2">
+                             <span className="text-muted small">Category:</span>
+                             <span className="fw-medium">{data.category}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-2">
+                             <span className="text-muted small">Type:</span>
+                             <span className="fw-medium">{formatLabel(data.typeKey)}</span>
+                        </div>
+                        <div className="d-flex justify-content-between mb-2">
+                             <span className="text-muted small">Email:</span>
+                             <a href={`mailto:${data.requester?.email}`} className="text-decoration-none small">{data.requester?.email}</a>
+                        </div>
                     </div>
-                    <div className="col-md-6 border-start">
-                         <table className="table table-borderless table-sm m-0 ps-3">
-                            <tbody>
-                                <tr><td className="text-muted w-25">Loại:</td><td>{data.typeKey}</td></tr>
-                                {!isSimpleWorkflow && (
-                                    <tr>
-                                        <td className="text-muted">Phân công:</td>
-                                        <td>
-                                            {isManager ? (
-                                                <select className="form-select form-select-sm py-0 w-auto d-inline-block" 
-                                                    value={data.assignedTo?._id || ''} 
-                                                    onChange={(e) => e.target.value && handleAction(() => apiAssignRequest(token!, id!, e.target.value))}
-                                                >
-                                                    <option value="">-- Chọn --</option>
-                                                    {staffList.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
-                                                </select>
-                                            ) : <span className="fw-bold">{data.assignedTo?.name || 'Chưa giao'}</span>}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+
+                    {/* Cột 2: Workflow & Assignee */}
+                    <div className="col-md-6">
+                        <h6 className="text-uppercase text-secondary small fw-bold mb-3 ls-1 border-bottom pb-2">Workflow</h6>
+                        <div className="d-flex justify-content-between mb-2">
+                             <span className="text-muted small">Department:</span>
+                             <span className="fw-medium">{data.department || data.category}</span>
+                        </div>
+                        
+                        {!isSimpleWorkflow && (
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="text-muted small">Assigned To:</span>
+                                <div>
+                                    {isManager ? (
+                                        <select className="form-select form-select-sm py-1 w-auto bg-light border-0 fw-medium" 
+                                            value={data.assignedTo?._id || ''} 
+                                            onChange={(e) => e.target.value && handleAction(() => apiAssignRequest(token!, id!, e.target.value))}
+                                        >
+                                            <option value="">-- Unassigned --</option>
+                                            {staffList.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                                        </select>
+                                    ) : (
+                                        data.assignedTo ? (
+                                            <div className="d-flex align-items-center">
+                                                <div className={`rounded-circle text-white d-flex align-items-center justify-content-center me-2 small ${getAvatarColor(data.assignedTo.name)}`} style={{width: 24, height: 24}}>{data.assignedTo.name[0]}</div>
+                                                <span className="fw-medium">{data.assignedTo.name}</span>
+                                            </div>
+                                        ) : <span className="text-muted fst-italic">Unassigned</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Tabs Navigation */}
-                <ul className="nav nav-tabs mb-3 border-bottom">
+                {/* Tabs Navigation (Style hiện đại hơn) */}
+                <ul className="nav nav-tabs nav-tabs-custom mb-4 border-bottom">
                     <li className="nav-item">
-                        <button className={`nav-link py-2 ${activeTab === 'desc' ? 'active fw-bold' : ''}`} onClick={() => setActiveTab('desc')}>Nội dung</button>
+                        <button className={`nav-link px-4 py-2 ${activeTab === 'desc' ? 'active fw-bold border-bottom border-primary border-2 text-primary' : 'text-muted'}`} onClick={() => setActiveTab('desc')}>Description & Files</button>
                     </li>
                     <li className="nav-item">
-                        <button className={`nav-link py-2 ${activeTab === 'custom' ? 'active fw-bold' : ''}`} onClick={() => setActiveTab('custom')}>Chi tiết</button>
+                        <button className={`nav-link px-4 py-2 ${activeTab === 'custom' ? 'active fw-bold border-bottom border-primary border-2 text-primary' : 'text-muted'}`} onClick={() => setActiveTab('custom')}>Detailed Specs</button>
                     </li>
                     <li className="nav-item">
-                        <button className={`nav-link py-2 ${activeTab === 'approval' ? 'active fw-bold' : ''}`} onClick={() => setActiveTab('approval')}>Quy trình duyệt</button>
+                        <button className={`nav-link px-4 py-2 ${activeTab === 'approval' ? 'active fw-bold border-bottom border-primary border-2 text-primary' : 'text-muted'}`} onClick={() => setActiveTab('approval')}>Approvals</button>
                     </li>
                 </ul>
 
                 {/* Tabs Content */}
                 <div className="min-vh-50">
+                    
+                    {/* Tab 1: Description & Attachments */}
                     {activeTab === 'desc' && (
                         <div className="animate__animated animate__fadeIn">
-                            <div className="p-3 bg-light rounded border mb-3 text-secondary" style={{whiteSpace: 'pre-line'}}>
-                                {data.description || 'Không có mô tả chi tiết.'}
+                            <div className="p-4 bg-light rounded-3 border mb-4 text-dark" style={{whiteSpace: 'pre-line', lineHeight: '1.6'}}>
+                                {data.description || <span className="text-muted fst-italic">No detailed description provided.</span>}
                             </div>
-                            {data.attachments && data.attachments.length > 0 && (
-                                <div>
-                                    <h6 className="small text-muted fw-bold mb-2 text-uppercase">Tài liệu đính kèm</h6>
-                                    <div className="d-flex flex-wrap gap-2">
-                                        {data.attachments.map((f, i) => (
-                                            <a key={i} href={`${API_BASE_URL}/uploads/${f.path}`} target="_blank" className="btn btn-sm btn-white border d-flex align-items-center text-dark text-decoration-none shadow-sm">
-                                                <i className="bi bi-file-earmark-text text-danger me-2"></i> {f.filename}
-                                            </a>
-                                        ))}
-                                    </div>
+                            
+                            <h6 className="small text-muted fw-bold mb-3 text-uppercase">Attachments ({data.attachments?.length || 0})</h6>
+                            {data.attachments && data.attachments.length > 0 ? (
+                                <div className="d-flex flex-wrap gap-3">
+                                    {data.attachments.map((f, i) => (
+                                        <a key={i} href={`${API_BASE_URL}/uploads/${f.path}`} target="_blank" className="card text-decoration-none shadow-sm border-0 bg-light" style={{width: 200}}>
+                                            <div className="card-body p-3 d-flex align-items-center">
+                                                <div className="bg-white rounded p-2 me-3 border">
+                                                    <i className="bi bi-file-earmark-text text-danger fs-4"></i>
+                                                </div>
+                                                <div className="text-truncate">
+                                                    <div className="text-dark small fw-bold text-truncate">{f.filename}</div>
+                                                    <div className="text-muted" style={{fontSize: '0.7rem'}}>Click to view</div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    ))}
                                 </div>
-                            )}
+                            ) : <div className="text-muted small">No attachments found.</div>}
                         </div>
                     )}
 
+                    {/* Tab 2: Custom Fields (Định dạng Table đẹp hơn) */}
                     {activeTab === 'custom' && (
                         <div className="animate__animated animate__fadeIn">
-                            <table className="table table-bordered table-sm w-100">
-                                <thead className="bg-light"><tr><th>Trường dữ liệu</th><th>Giá trị</th></tr></thead>
+                            <table className="table table-bordered table-striped-columns w-100">
                                 <tbody>
                                     {data.custom && Object.entries(data.custom).map(([k, v]) => (
-                                        <tr key={k}><td className="text-muted w-25 text-capitalize">{k}</td><td className="fw-bold">{String(v)}</td></tr>
+                                        <tr key={k}>
+                                            <td className="text-secondary fw-medium w-25 bg-light px-3">{formatLabel(k)}</td>
+                                            <td className="fw-bold px-3 text-dark">
+                                                {typeof v === 'boolean' ? (v ? <span className="text-success">Yes</span> : <span className="text-danger">No</span>) : String(v)}
+                                            </td>
+                                        </tr>
                                     ))}
-                                    {(!data.custom || Object.keys(data.custom).length === 0) && <tr><td colSpan={2} className="text-center text-muted">Không có dữ liệu</td></tr>}
+                                    {(!data.custom || Object.keys(data.custom).length === 0) && <tr><td colSpan={2} className="text-center text-muted py-4">No custom fields available.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
                     )}
 
+                    {/* Tab 3: Approval Workflow */}
                     {activeTab === 'approval' && (
                         <div className="animate__animated animate__fadeIn">
-                            <table className="table table-hover table-sm">
-                                <thead><tr><th>Cấp</th><th>Người duyệt</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
-                                <tbody>
-                                    {data.approvals?.map((step, idx) => (
-                                        <tr key={idx}>
-                                            <td>Bước {step.level} ({step.role})</td>
-                                            <td>{step.approver?.name || '-'}</td>
-                                            <td>
-                                                {step.decision === 'APPROVED' ? <span className="text-success fw-bold"><i className="bi bi-check-circle"></i> Đồng ý</span> : 
-                                                 step.decision === 'REJECTED' ? <span className="text-danger fw-bold"><i className="bi bi-x-circle"></i> Từ chối</span> : 
-                                                 <span className="text-muted fst-italic">Đang chờ...</span>}
-                                            </td>
-                                            <td className="text-muted small">{step.comment}</td>
-                                        </tr>
-                                    ))}
-                                    {(!data.approvals || data.approvals.length === 0) && <tr><td colSpan={4} className="text-center text-muted">Quy trình này không yêu cầu duyệt</td></tr>}
-                                </tbody>
-                            </table>
+                            <div className="table-responsive">
+                                <table className="table align-middle">
+                                    <thead className="bg-light"><tr><th className="fw-medium text-secondary">Step</th><th className="fw-medium text-secondary">Approver</th><th className="fw-medium text-secondary">Status</th><th className="fw-medium text-secondary">Comment</th></tr></thead>
+                                    <tbody>
+                                        {data.approvals?.map((step, idx) => (
+                                            <tr key={idx}>
+                                                <td>
+                                                    <div className="fw-bold text-dark">Step {step.level}</div>
+                                                    <div className="small text-muted">{step.role}</div>
+                                                </td>
+                                                <td>
+                                                    {step.approver ? (
+                                                         <div className="d-flex align-items-center">
+                                                            <div className={`rounded-circle text-white d-flex align-items-center justify-content-center me-2 small ${getAvatarColor(step.approver.name)}`} style={{width: 28, height: 28}}>{step.approver.name[0]}</div>
+                                                            <span>{step.approver.name}</span>
+                                                        </div>
+                                                    ) : '-'}
+                                                </td>
+                                                <td>
+                                                    {step.decision === 'APPROVED' ? <span className="badge bg-success-subtle text-success border border-success px-2 py-1"><i className="bi bi-check-circle-fill me-1"></i> Approved</span> : 
+                                                     step.decision === 'REJECTED' ? <span className="badge bg-danger-subtle text-danger border border-danger px-2 py-1"><i className="bi bi-x-circle-fill me-1"></i> Rejected</span> : 
+                                                     <span className="badge bg-light text-muted border px-2 py-1">Pending</span>}
+                                                </td>
+                                                <td className="text-muted small fst-italic">{step.comment || '-'}</td>
+                                            </tr>
+                                        ))}
+                                        {(!data.approvals || data.approvals.length === 0) && <tr><td colSpan={4} className="text-center text-muted py-4">No approval workflow configured.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -315,20 +388,20 @@ export default function RequestDetail() {
              </div>
          </div>
 
-         {/* --- RIGHT COLUMN: CHATTER (Sidebar) --- */}
-         <div className="border-start bg-white d-flex flex-column h-100" style={{width: 360, minWidth: 360}}>
+         {/* --- RIGHT COLUMN: CHATTER (Sidebar) - Giữ nguyên logic --- */}
+         <div className="border-start bg-white d-flex flex-column h-100 shadow-sm" style={{width: 380, minWidth: 380}}>
              
-             <div className="p-2 border-bottom bg-light text-muted fw-bold small d-flex justify-content-between align-items-center">
-                 <span><i className="bi bi-chat-dots-fill me-2"></i> THẢO LUẬN & LOG</span>
-                 <span className="badge bg-secondary rounded-pill">{chatterMessages.length}</span>
+             <div className="p-3 border-bottom bg-light text-dark fw-bold small d-flex justify-content-between align-items-center">
+                 <span><i className="bi bi-clock-history me-2"></i> ACTIVITY LOG</span>
+                 <span className="badge bg-primary rounded-pill">{chatterMessages.length}</span>
              </div>
              
              {/* Input */}
-             <div className="p-3 border-bottom bg-light-subtle">
+             <div className="p-3 border-bottom bg-white">
                  <textarea 
-                    className="form-control mb-2 shadow-sm border-0" 
-                    rows={2} 
-                    placeholder="Viết ghi chú..." 
+                    className="form-control mb-2 bg-light border-0" 
+                    rows={3} 
+                    placeholder="Type a message or internal note..." 
                     value={comment} 
                     onChange={e => setComment(e.target.value)}
                     style={{resize: 'none', fontSize: '0.9rem'}}
@@ -337,13 +410,13 @@ export default function RequestDetail() {
                      {isManager ? (
                         <div className="form-check form-switch">
                             <input className="form-check-input" type="checkbox" id="internalSwitch" checked={isInternalNote} onChange={e => setIsInternalNote(e.target.checked)} style={{cursor: 'pointer'}} />
-                            <label className="form-check-label small text-muted" htmlFor="internalSwitch" style={{fontSize: '0.75rem'}}>Ghi chú nội bộ</label>
+                            <label className="form-check-label small text-muted fw-medium" htmlFor="internalSwitch">Internal Note</label>
                         </div>
                      ) : <div></div>}
-                     <button className="btn btn-sm btn-primary px-3 rounded-pill" onClick={() => {
+                     <button className="btn btn-sm btn-primary px-3 rounded-pill fw-bold" disabled={!comment.trim()} onClick={() => {
                         if(comment.trim()) handleAction(() => apiAddComment(token!, id!, comment, isInternalNote)).then(() => setComment(''));
                      }}>
-                        <i className="bi bi-send-fill"></i>
+                        SEND <i className="bi bi-send-fill ms-1"></i>
                      </button>
                  </div>
              </div>
@@ -352,16 +425,18 @@ export default function RequestDetail() {
              <div className="flex-grow-1 overflow-y-auto p-0 bg-white custom-scrollbar">
                  {chatterMessages.map((msg) => (
                      <div key={msg.id} className={`p-3 border-bottom ${msg.style} ${msg.isInternal ? 'border-start border-warning border-4' : ''}`}>
-                         <div className="d-flex justify-content-between align-items-start mb-1">
+                         <div className="d-flex justify-content-between align-items-start mb-2">
                              <div className="d-flex align-items-center">
-                                 <div className="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2 small" style={{width: 24, height: 24}}>
+                                 <div className={`rounded-circle text-white d-flex align-items-center justify-content-center me-2 small ${getAvatarColor(msg.author)}`} style={{width: 28, height: 28}}>
                                      {msg.avatar}
                                  </div>
-                                 <strong className="text-dark small">{msg.author}</strong>
+                                 <div className="lh-1">
+                                    <div className="fw-bold text-dark small">{msg.author}</div>
+                                    <div className="text-muted" style={{fontSize: '0.65rem'}}>{msg.isInternal && <span className="text-warning fw-bold me-1">[INTERNAL]</span>}{formatDate(msg.date)}</div>
+                                 </div>
                              </div>
-                             <small className="text-muted" style={{fontSize: '0.65rem'}}>{msg.date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} {msg.date.toLocaleDateString()}</small>
                          </div>
-                         <div className="ps-4 ms-1 text-secondary small" style={{whiteSpace: 'pre-wrap'}}>
+                         <div className="ps-5 text-secondary small" style={{whiteSpace: 'pre-wrap', lineHeight: '1.5'}}>
                             {msg.content}
                          </div>
                      </div>

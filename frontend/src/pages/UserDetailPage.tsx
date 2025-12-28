@@ -39,7 +39,7 @@ export default function UserDetailPage() {
 
     } catch (err) {
       console.error(err);
-      alert('Không tải được thông tin nhân viên');
+      alert('Failed to load user information');
       navigate('/admin/users');
     } finally {
       setLoading(false);
@@ -48,7 +48,7 @@ export default function UserDetailPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!window.confirm('Lưu thay đổi thông tin nhân viên?')) return;
+    if (!window.confirm('Save changes to user information?')) return;
 
     setSaving(true);
     try {
@@ -59,10 +59,10 @@ export default function UserDetailPage() {
         isManager 
       });
       
-      alert('Cập nhật thành công!');
+      alert('Updated successfully!');
       await loadUser(); 
     } catch (err: any) {
-      alert(err.message || 'Lỗi cập nhật');
+      alert(err.message || 'Update failed');
     } finally {
       setSaving(false);
     }
@@ -79,7 +79,7 @@ export default function UserDetailPage() {
   return (
     <div className="d-flex flex-column h-100 bg-white">
       
-      {/* 1. HEADER (CONTROL PANEL) - Dính liền, không margin/padding thừa */}
+      {/* 1. HEADER (CONTROL PANEL) - Sticky */}
       <div className="border-bottom px-4 py-3 d-flex justify-content-between align-items-center bg-white sticky-top" style={{zIndex: 100}}>
         
         {/* Breadcrumb + Title */}
@@ -88,18 +88,18 @@ export default function UserDetailPage() {
                 onClick={() => navigate('/admin/users')} 
                 className="btn btn-light btn-sm border-0 rounded-circle d-flex align-items-center justify-content-center" 
                 style={{width: 32, height: 32}}
-                title="Quay lại danh sách"
+                title="Back to list"
             >
                 <i className="bi bi-arrow-left"></i>
             </button>
             <div>
                 <nav aria-label="breadcrumb">
                     <ol className="breadcrumb mb-0 small" style={{fontSize: '0.75rem'}}>
-                        <li className="breadcrumb-item"><Link to="/admin/users" className="text-decoration-none text-muted">NHÂN VIÊN</Link></li>
-                        <li className="breadcrumb-item active fw-bold text-uppercase" style={{ color: '#008784' }}>CHI TIẾT</li>
+                        <li className="breadcrumb-item"><Link to="/admin/users" className="text-decoration-none text-muted">EMPLOYEES</Link></li>
+                        <li className="breadcrumb-item active fw-bold text-uppercase" style={{ color: '#008784' }}>DETAILS</li>
                     </ol>
                 </nav>
-                <h5 className="mb-0 fw-bold text-dark">{name || 'Đang tải...'}</h5>
+                <h5 className="mb-0 fw-bold text-dark">{name || 'Loading...'}</h5>
             </div>
         </div>
 
@@ -113,7 +113,7 @@ export default function UserDetailPage() {
                     style={{ backgroundColor: '#008784', borderColor: '#008784' }}
                 >
                     {saving ? <span className="spinner-border spinner-border-sm me-2"></span> : <i className="bi bi-cloud-arrow-up-fill me-2"></i>}
-                    Lưu Thay Đổi
+                    Save Changes
                 </button>
             )}
         </div>
@@ -123,17 +123,17 @@ export default function UserDetailPage() {
       <div className="flex-grow-1 overflow-hidden">
          <div className="row g-0 h-100">
             
-            {/* Cột Trái: FORM NHẬP LIỆU (Chiếm 8/12) - Scrollable */}
+            {/* Left Column: DATA ENTRY FORM (8/12) - Scrollable */}
             <div className="col-lg-8 h-100 overflow-y-auto">
                 <div className="p-5" style={{maxWidth: '900px'}}>
                     <h6 className="text-uppercase text-muted fw-bold small border-bottom pb-2 mb-4">
-                        <i className="bi bi-person-lines-fill me-2"></i>Thông tin chung
+                        <i className="bi bi-person-lines-fill me-2"></i>General Information
                     </h6>
                     
                     <form id="userForm">
                         <div className="row g-4 mb-5">
                             <div className="col-md-6">
-                                <label className="form-label fw-bold text-secondary small text-uppercase">Họ và tên</label>
+                                <label className="form-label fw-bold text-secondary small text-uppercase">Full Name</label>
                                 <input 
                                     type="text" 
                                     className="form-control" 
@@ -155,7 +155,7 @@ export default function UserDetailPage() {
                                 />
                             </div>
                             <div className="col-md-6">
-                                <label className="form-label fw-bold text-secondary small text-uppercase">Số điện thoại</label>
+                                <label className="form-label fw-bold text-secondary small text-uppercase">Phone Number</label>
                                 <input 
                                     type="text" 
                                     className="form-control" 
@@ -166,7 +166,7 @@ export default function UserDetailPage() {
                                 />
                             </div>
                             <div className="col-md-6">
-                                <label className="form-label fw-bold text-secondary small text-uppercase">Phòng ban</label>
+                                <label className="form-label fw-bold text-secondary small text-uppercase">Department</label>
                                 <select 
                                     className="form-select" 
                                     value={department} 
@@ -174,10 +174,10 @@ export default function UserDetailPage() {
                                     disabled={!isAdmin}
                                     style={{height: '45px'}}
                                 >
-                                    <option value="IT">IT (Công nghệ thông tin)</option>
-                                    <option value="HR">HR (Nhân sự)</option>
-                                    <option value="SALES">Sales (Kinh doanh)</option>
-                                    <option value="ACCOUNTING">Kế toán</option>
+                                    <option value="IT">IT (Information Technology)</option>
+                                    <option value="HR">HR (Human Resources)</option>
+                                    <option value="SALES">Sales</option>
+                                    <option value="ACCOUNTING">Accounting</option>
                                 </select>
                             </div>
                         </div>
@@ -185,11 +185,11 @@ export default function UserDetailPage() {
                 </div>
             </div>
 
-            {/* Cột Phải: SIDEBAR CẤU HÌNH (Chiếm 4/12) - Background xám nhạt */}
+            {/* Right Column: CONFIGURATION SIDEBAR (4/12) */}
             <div className="col-lg-4 border-start bg-light h-100 overflow-y-auto">
                 <div className="p-4">
                     <h6 className="text-uppercase text-muted fw-bold small border-bottom pb-2 mb-4">
-                        <i className="bi bi-gear-fill me-2"></i>Cấu hình & Phân quyền
+                        <i className="bi bi-gear-fill me-2"></i>Configuration & Permissions
                     </h6>
 
                     {/* Switch Manager */}
@@ -205,18 +205,18 @@ export default function UserDetailPage() {
                                     style={{ width: '3em', height: '1.5em', cursor: 'pointer' }}
                                 />
                                 <label className="form-check-label ms-3 pt-1 fw-bold text-dark" htmlFor="managerCheck" style={{cursor: 'pointer'}}>
-                                    Chỉ định Quản lý (Manager)
+                                    Designate as Manager
                                 </label>
                             </div>
                             <div className="mt-3 text-muted small lh-sm">
-                                Khi kích hoạt, nhân viên này sẽ có quyền duyệt các yêu cầu thuộc phòng ban <strong>{department || '...'}</strong>.
+                                When activated, this employee will have permission to approve requests belonging to the <strong>{department || '...'}</strong> department.
                             </div>
                         </div>
                     )}
 
                     {/* Current Roles */}
                     <div className="mb-4">
-                        <label className="form-label fw-bold text-secondary small text-uppercase mb-3">Vai trò hiện tại trong hệ thống</label>
+                        <label className="form-label fw-bold text-secondary small text-uppercase mb-3">Current System Roles</label>
                         <div className="d-flex flex-wrap gap-2">
                             {currentRoles.map(r => (
                                 <span key={r} className={`badge px-3 py-2 border rounded-pill fw-normal ${
@@ -235,12 +235,12 @@ export default function UserDetailPage() {
                         <table className="table table-borderless table-sm text-muted small m-0">
                             <tbody>
                                 <tr>
-                                    <td style={{width: 100}}>ID Hệ thống:</td>
+                                    <td style={{width: 100}}>System ID:</td>
                                     <td className="font-monospace text-dark">{id}</td>
                                 </tr>
                                 
                                 <tr>
-                                    <td>Ngày tạo:</td>
+                                    <td>Created At:</td>
                                     <td>---</td>
                                 </tr>
                             </tbody>

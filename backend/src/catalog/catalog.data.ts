@@ -64,8 +64,21 @@ export const DEFAULT_CATALOG: CatalogItem[] = [
     typeKey: 'leave_request',
     title: 'Xin nghỉ phép',
     fields: [
-      { key: 'from', label: 'Từ ngày', type: 'date', required: true },
-      { key: 'to', label: 'Đến ngày', type: 'date', required: true },
+      // [MỚI] Thêm trường chọn loại nghỉ để khớp logic trừ phép
+      {
+        key: 'leaveType',
+        label: 'Loại nghỉ',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'PAID', label: 'Nghỉ có lương' },
+          { value: 'UNPAID', label: 'Nghỉ không lương' },
+        ],
+      },
+      // [SỬA] Đổi key 'from' -> 'fromDate' để khớp với Backend Service
+      { key: 'fromDate', label: 'Từ ngày', type: 'date', required: true },
+      // [SỬA] Đổi key 'to' -> 'toDate' để khớp với Backend Service
+      { key: 'toDate', label: 'Đến ngày', type: 'date', required: true },
       { key: 'reason', label: 'Lý do', type: 'textarea' },
     ],
     approvalFlow: [{ level: 1, role: 'HR_MANAGER' }],

@@ -34,7 +34,7 @@ export default function AdminUsersPage() {
         department,
       });
 
-      setMsg('Đã tạo hồ sơ nhân viên thành công!');
+      setMsg('User profile created successfully!');
       // Reset form
       setName(''); 
       setEmail(''); 
@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
       setDepartment('IT');
       
     } catch (e: any) {
-      setErr(e?.message || 'Không thể tạo nhân viên. Vui lòng kiểm tra lại.');
+      setErr(e?.message || 'Could not create user. Please check again.');
     } finally {
       setLoading(false);
     }
@@ -52,22 +52,22 @@ export default function AdminUsersPage() {
   return (
     <div className="d-flex flex-column h-100 bg-white">
       
-      {/* 1. HEADER (CONTROL PANEL) - Dính liền & Sticky */}
+      {/* 1. HEADER (CONTROL PANEL) - Sticky */}
       <div className="border-bottom px-4 py-3 d-flex justify-content-between align-items-center bg-white sticky-top" style={{zIndex: 100}}>
         <div className="d-flex align-items-center gap-3">
             <button 
                 onClick={() => navigate('/admin/users')} 
                 className="btn btn-light btn-sm border-0 rounded-circle d-flex align-items-center justify-content-center"
                 style={{width: 32, height: 32}}
-                title="Quay lại danh sách"
+                title="Back to list"
             >
                 <i className="bi bi-arrow-left"></i>
             </button>
             <nav aria-label="breadcrumb">
                 <ol className="breadcrumb mb-0 small">
-                    <li className="breadcrumb-item text-muted">Quản trị</li>
-                    <li className="breadcrumb-item"><Link to="/admin/users" className="text-decoration-none text-muted">Người dùng</Link></li>
-                    <li className="breadcrumb-item active fw-bold" style={{ color: '#008784' }}>Tạo mới</li>
+                    <li className="breadcrumb-item text-muted">Administration</li>
+                    <li className="breadcrumb-item"><Link to="/admin/users" className="text-decoration-none text-muted">Users</Link></li>
+                    <li className="breadcrumb-item active fw-bold" style={{ color: '#008784' }}>Create New</li>
                 </ol>
             </nav>
         </div>
@@ -76,7 +76,7 @@ export default function AdminUsersPage() {
       {/* 2. MAIN CONTENT - Full Height & Scrollable */}
       <div className="flex-grow-1 overflow-y-auto">
          
-         {/* Wrapper căn giữa nội dung form để dễ nhìn, nhưng nền vẫn full trắng */}
+         {/* Wrapper centered but full white background */}
          <div className="p-4 p-md-5 mx-auto" style={{maxWidth: '900px'}}>
             
             {/* Header Form */}
@@ -87,9 +87,9 @@ export default function AdminUsersPage() {
                         <i className="bi bi-person-plus-fill fs-3" style={{ color: '#008784' }}></i>
                     </div>
                     <div className="text-center text-md-start">
-                        <h3 className="fw-bold text-dark mb-1">Thêm Nhân Viên Mới</h3>
+                        <h3 className="fw-bold text-dark mb-1">Add New User</h3>
                         <p className="text-muted small mb-0">
-                            Điền thông tin để tạo tài khoản truy cập hệ thống Internal Portal.
+                            Fill in information to create an account for the Internal Portal.
                         </p>
                     </div>
                 </div>
@@ -101,15 +101,15 @@ export default function AdminUsersPage() {
 
             <form onSubmit={onSubmit}>
                 
-                {/* SECTION 1: THÔNG TIN CHUNG */}
+                {/* SECTION 1: GENERAL INFORMATION */}
                 <div className="row g-4 mb-5">
                     <div className="col-md-6">
-                        <label className="form-label fw-bold text-secondary small text-uppercase">Họ và tên <span className="text-danger">*</span></label>
+                        <label className="form-label fw-bold text-secondary small text-uppercase">Full Name <span className="text-danger">*</span></label>
                         <div className="input-group">
                             <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-person"></i></span>
                             <input 
                                 className="form-control border-start-0" 
-                                placeholder="Ví dụ: Nguyễn Văn A" 
+                                placeholder="Ex: John Doe" 
                                 value={name}
                                 onChange={(e) => setName(e.target.value)} 
                                 required 
@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
                     </div>
 
                     <div className="col-md-6">
-                        <label className="form-label fw-bold text-secondary small text-uppercase">Phòng ban <span className="text-danger">*</span></label>
+                        <label className="form-label fw-bold text-secondary small text-uppercase">Department <span className="text-danger">*</span></label>
                         <div className="input-group">
                             <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-building"></i></span>
                             <select 
@@ -144,18 +144,18 @@ export default function AdminUsersPage() {
                                 onChange={(e) => setDepartment(e.target.value)}
                                 style={{height: '45px'}}
                             >
-                                <option value="IT">IT (Công nghệ thông tin)</option>
-                                <option value="HR">HR (Nhân sự & Tuyển dụng)</option>
-                                <option value="SALES">Sales (Kinh doanh)</option>
-                                <option value="MARKETING">Marketing & Truyền thông</option>
-                                <option value="ACCOUNTING">Kế toán - Tài chính</option>
-                                <option value="OTHER">Khác</option>
+                                <option value="IT">IT (Information Technology)</option>
+                                <option value="HR">HR (Human Resources)</option>
+                                <option value="SALES">Sales</option>
+                                <option value="MARKETING">Marketing & Communications</option>
+                                <option value="ACCOUNTING">Finance & Accounting</option>
+                                <option value="OTHER">Other</option>
                             </select>
                         </div>
                     </div>
 
                     <div className="col-md-6">
-                        <label className="form-label fw-bold text-secondary small text-uppercase">Số điện thoại</label>
+                        <label className="form-label fw-bold text-secondary small text-uppercase">Phone Number</label>
                         <div className="input-group">
                             <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-telephone"></i></span>
                             <input 
@@ -170,20 +170,20 @@ export default function AdminUsersPage() {
                     </div>
                 </div>
 
-                {/* SECTION 2: BẢO MẬT */}
+                {/* SECTION 2: SECURITY */}
                 <h6 className="text-uppercase text-muted fw-bold small border-bottom pb-2 mb-4">
-                    <i className="bi bi-shield-lock me-2"></i>Thiết lập bảo mật
+                    <i className="bi bi-shield-lock me-2"></i>Security Settings
                 </h6>
 
                 <div className="row g-4">
                     <div className="col-12">
-                        <label className="form-label fw-bold text-secondary small text-uppercase">Mật khẩu khởi tạo <span className="text-danger">*</span></label>
+                        <label className="form-label fw-bold text-secondary small text-uppercase">Initial Password <span className="text-danger">*</span></label>
                         <div className="input-group">
                             <span className="input-group-text bg-white border-end-0 text-muted"><i className="bi bi-key"></i></span>
                             <input 
                                 className="form-control border-start-0 border-end-0" 
                                 type={showPass ? "text" : "password"}
-                                placeholder="Nhập mật khẩu mặc định (Tối thiểu 6 ký tự)"
+                                placeholder="Enter default password (min 6 chars)"
                                 value={password} 
                                 onChange={(e) => setPassword(e.target.value)} 
                                 minLength={6} 
@@ -200,7 +200,7 @@ export default function AdminUsersPage() {
                         </div>
                         <div className="form-text mt-2 text-muted">
                             <i className="bi bi-info-circle me-1"></i>
-                            Nhân viên sẽ được yêu cầu đổi mật khẩu này trong lần đăng nhập đầu tiên.
+                            The user will be required to change this password upon first login.
                         </div>
                     </div>
                 </div>
@@ -213,7 +213,7 @@ export default function AdminUsersPage() {
                             onClick={() => navigate('/admin/users')}
                             disabled={loading}
                         >
-                            Hủy bỏ
+                            Cancel
                         </button>
                         <button 
                             type="submit" 
@@ -224,11 +224,11 @@ export default function AdminUsersPage() {
                             {loading ? (
                                 <>
                                     <span className="spinner-border spinner-border-sm me-2"></span>
-                                    Đang tạo...
+                                    Creating...
                                 </>
                             ) : (
                                 <>
-                                    <i className="bi bi-check-lg me-2"></i> Hoàn tất
+                                    <i className="bi bi-check-lg me-2"></i> Complete
                                 </>
                             )}
                         </button>

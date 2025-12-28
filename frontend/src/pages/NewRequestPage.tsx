@@ -136,7 +136,7 @@ export default function NewRequestPage() {
         }
       } catch (e: any) {
         setCatalog([]);
-        alert(e?.message || 'Không tải được catalog');
+        alert(e?.message || 'Failed to load catalog');
       }
     })();
     return () => { cancelled = true; };
@@ -182,7 +182,7 @@ export default function NewRequestPage() {
   }, [token, current, form.typeKey, JSON.stringify(form.custom)]);
 
   const onSubmit = async () => {
-    if (!token) return alert('Bạn chưa đăng nhập.');
+    if (!token) return alert('You are not logged in.');
     setLoading(true);
     try {
       const normalizedCustom = { ...form.custom };
@@ -224,20 +224,20 @@ export default function NewRequestPage() {
 
       navigate('/requests/mine');
     } catch (err: any) {
-      alert(err?.message || 'Không thể tạo yêu cầu. Vui lòng thử lại.');
+      alert(err?.message || 'Could not create request. Please try again.');
       setLoading(false);
     }
   };
 
   return (
-    <div className="d-flex flex-column h-100" style={{ backgroundColor: '#f9f9f9', fontSize: '0.92rem' }}> {/* [STYLE] Giảm font size toàn trang */}
+    <div className="d-flex flex-column h-100" style={{ backgroundColor: '#f9f9f9', fontSize: '0.92rem' }}>
       
       {/* MAIN WORKSPACE - Full Width, Compact Spacing */}
-      <div className="flex-grow-1 overflow-y-auto p-3"> {/* [STYLE] Giảm padding container chính */}
+      <div className="flex-grow-1 overflow-y-auto p-3">
          
          <div className="container-fluid p-0">
             
-            <div className="row g-3"> {/* [STYLE] Giảm khoảng cách Grid */}
+            <div className="row g-3">
                 
                 {/* LEFT: FORM SHEET */}
                 <div className={aiSuggestions.length > 0 ? "col-lg-9" : "col-12"}>
@@ -247,27 +247,27 @@ export default function NewRequestPage() {
                         <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom bg-light">
                             <nav aria-label="breadcrumb">
                                 <ol className="breadcrumb mb-0 small">
-                                    <li className="breadcrumb-item text-muted">Yêu cầu</li>
-                                    <li className="breadcrumb-item active fw-bold" style={{ color: '#008784' }}>Tạo mới</li>
+                                    <li className="breadcrumb-item text-muted">Requests</li>
+                                    <li className="breadcrumb-item active fw-bold" style={{ color: '#008784' }}>Create New</li>
                                 </ol>
                             </nav>
                             <button className="btn btn-sm btn-white border text-muted d-flex align-items-center gap-1 shadow-sm" onClick={() => navigate(-1)} style={{fontSize: '0.8rem'}}>
-                                <i className="bi bi-x-lg"></i> Hủy
+                                <i className="bi bi-x-lg"></i> Cancel
                             </button>
                         </div>
 
-                        <div className="card-body p-3 p-md-4"> {/* [STYLE] Giảm padding Card Body */}
+                        <div className="card-body p-3 p-md-4">
                             
-                            {/* 2. Chọn Phòng ban & Loại (Compact Row) */}
+                            {/* 2. Choose Dept & Type (Compact Row) */}
                             <div className="row g-3 mb-3 pb-3 border-bottom">
                                 <div className="col-md-4 col-xl-3">
-                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>PHÒNG BAN</label>
+                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>DEPARTMENT</label>
                                     <div className="btn-group w-100" role="group">
                                         <input 
                                             type="radio" className="btn-check" name="btnCategory" id="btnHr" autoComplete="off" 
                                             checked={form.category === 'HR'} onChange={() => setForm(o => ({...o, category: 'HR', typeKey: '', custom: {}}))}
                                         />
-                                        <label className={`btn btn-sm ${form.category === 'HR' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnHr"> {/* btn-sm */}
+                                        <label className={`btn btn-sm ${form.category === 'HR' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnHr">
                                             <i className="bi bi-people-fill me-1"></i> HR
                                         </label>
 
@@ -275,15 +275,15 @@ export default function NewRequestPage() {
                                             type="radio" className="btn-check" name="btnCategory" id="btnIt" autoComplete="off"
                                             checked={form.category === 'IT'} onChange={() => setForm(o => ({...o, category: 'IT', typeKey: '', custom: {}}))}
                                         />
-                                        <label className={`btn btn-sm ${form.category === 'IT' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnIt"> {/* btn-sm */}
+                                        <label className={`btn btn-sm ${form.category === 'IT' ? 'btn-primary' : 'btn-outline-secondary'}`} htmlFor="btnIt">
                                             <i className="bi bi-pc-display me-1"></i> IT
                                         </label>
                                     </div>
                                 </div>
                                 <div className="col-md-8 col-xl-9">
-                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>LOẠI YÊU CẦU</label>
+                                    <label className="text-muted small fw-bold mb-1" style={{fontSize: '0.75rem'}}>REQUEST TYPE</label>
                                     <select
-                                        className="form-select form-select-sm bg-light" // form-select-sm
+                                        className="form-select form-select-sm bg-light"
                                         value={form.typeKey}
                                         onChange={(e) => {
                                             const tk = e.target.value;
@@ -294,7 +294,7 @@ export default function NewRequestPage() {
                                         }}
                                         style={{height: '31px'}}
                                     >
-                                        <option value="">-- Chọn danh mục --</option>
+                                        <option value="">-- Select Category --</option>
                                         {catalog.map((c) => (
                                             <option key={c.typeKey} value={c.typeKey}>{c.title}</option>
                                         ))}
@@ -302,18 +302,18 @@ export default function NewRequestPage() {
                                 </div>
                             </div>
 
-                            {/* 3. Form Nhập Liệu */}
+                            {/* 3. Input Form */}
                             {current ? (
                                 <div className="animate__animated animate__fadeIn">
                                     
                                     <div className="mb-3">
-                                        <label className="form-label fw-bold small text-secondary">Tiêu đề yêu cầu <span className="text-danger">*</span></label>
+                                        <label className="form-label fw-bold small text-secondary">Request Title <span className="text-danger">*</span></label>
                                         <input
-                                            className="form-control bg-white border-secondary-subtle fw-semibold" // Bỏ form-control-lg
+                                            className="form-control bg-white border-secondary-subtle fw-semibold"
                                             required
                                             value={form.title}
                                             onChange={(e) => setForm((old) => ({ ...old, title: e.target.value }))}
-                                            placeholder={`Ví dụ: ${current.title}...`}
+                                            placeholder={`Ex: ${current.title}...`}
                                             style={{fontSize: '0.95rem'}}
                                         />
                                     </div>
@@ -326,15 +326,14 @@ export default function NewRequestPage() {
                                                     className="form-check-input" type="checkbox" role="switch" id="singleDayCheck"
                                                     checked={isSingleDay}
                                                     onChange={e => setIsSingleDay(e.target.checked)}
-                                                    style={{cursor: 'pointer', transform: 'scale(0.8)'}} // Thu nhỏ switch
+                                                    style={{cursor: 'pointer', transform: 'scale(0.8)'}}
                                                 />
                                                 <label className="form-check-label fw-bold small" htmlFor="singleDayCheck" style={{marginTop: '2px'}}>
-                                                    Chỉ trong 1 ngày
+                                                    One day only
                                                 </label>
                                             </div>
                                         )}
 
-                                        {/* Lưu ý: Để RequestDynamicFields nhỏ lại, bạn cần đảm bảo component đó dùng class form-control-sm hoặc kế thừa style */}
                                         <div className="small-form-group">
                                             <RequestDynamicFields
                                                 fields={visibleFields}
@@ -349,21 +348,21 @@ export default function NewRequestPage() {
 
                                     <div className="mb-3">
                                         <label className="form-label fw-bold small text-uppercase text-muted mb-1" style={{fontSize: '0.75rem'}}>
-                                            <i className="bi bi-paperclip me-1"></i> Đính kèm
+                                            <i className="bi bi-paperclip me-1"></i> Attachments
                                         </label>
-                                        <input ref={fileInputRef} type="file" multiple className="form-control form-control-sm" /> {/* form-control-sm */}
+                                        <input ref={fileInputRef} type="file" multiple className="form-control form-control-sm" />
                                     </div>
 
                                     <div className="mt-4 pt-3 border-top d-flex justify-content-end gap-2">
                                         <button 
-                                            className="btn btn-sm btn-light px-3"  // btn-sm
+                                            className="btn btn-sm btn-light px-3"
                                             onClick={() => navigate(-1)}
                                             disabled={loading}
                                         >
-                                            Quay lại
+                                            Back
                                         </button>
                                         <button 
-                                            className="btn btn-sm btn-primary px-4 fw-bold shadow-sm" // btn-sm
+                                            className="btn btn-sm btn-primary px-4 fw-bold shadow-sm"
                                             onClick={onSubmit} 
                                             disabled={loading || !token}
                                             style={{ backgroundColor: '#008784', borderColor: '#008784' }}
@@ -371,11 +370,11 @@ export default function NewRequestPage() {
                                             {loading ? (
                                                 <>
                                                     <span className="spinner-border spinner-border-sm me-2"></span>
-                                                    Đang gửi...
+                                                    Sending...
                                                 </>
                                             ) : (
                                                 <>
-                                                    <i className="bi bi-send-fill me-2"></i> Gửi Yêu Cầu
+                                                    <i className="bi bi-send-fill me-2"></i> Submit Request
                                                 </>
                                             )}
                                         </button>
@@ -387,7 +386,7 @@ export default function NewRequestPage() {
                                     <div className="mb-2 text-muted opacity-25">
                                         <i className="bi bi-inbox fs-2"></i>
                                     </div>
-                                    <small className="text-muted">Chọn loại yêu cầu ở trên</small>
+                                    <small className="text-muted">Select a request type above</small>
                                 </div>
                             )}
                         </div>
@@ -400,7 +399,7 @@ export default function NewRequestPage() {
                         <div className="card border-0 shadow-sm bg-primary-subtle sticky-top" style={{top: 10}}>
                             <div className="card-header bg-transparent border-0 pt-2 pb-0">
                                 <h6 className="fw-bold text-primary-emphasis d-flex align-items-center small mb-1">
-                                    <i className="bi bi-stars me-2"></i> Gợi ý AI
+                                    <i className="bi bi-stars me-2"></i> AI Suggestions
                                 </h6>
                             </div>
                             <div className="card-body p-2">
