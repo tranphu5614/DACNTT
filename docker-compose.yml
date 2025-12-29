@@ -18,8 +18,19 @@ services:
       - mongodb
     ports:
       - "3000:3000"
-    env_file:
-      - ./backend/.env
+    # Dùng environment để ánh xạ các biến từ file .env hoặc từ Render Dashboard
+    environment:
+      - PORT=${PORT}
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}
+      - SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - ./backend/uploads:/app/uploads
 
@@ -31,6 +42,8 @@ services:
       - "80:80"
     depends_on:
       - backend
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
 
 volumes:
   mongo_data:
