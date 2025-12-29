@@ -15,8 +15,20 @@ const THEME = {
 export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
   const { user, hasRole } = useAuth();
   
+  // Logic phân quyền
   const isAdmin = hasRole('ADMIN');
   const isManager = isAdmin || hasRole('MANAGER') || hasRole('HR_MANAGER') || hasRole('IT_MANAGER');
+  
+  // [CẬP NHẬT] Logic quyền cho bộ phận Sale
+  // Hiển thị nếu:
+  // 1. Là Admin hoặc Sale Manager
+  // 2. Hoặc có role SALE_STAFF
+  // 3. Hoặc thuộc phòng ban 'SALE' / 'SALES' (quan trọng cho nhân viên thường)
+  const isSales = 
+      isAdmin || 
+      hasRole('SALE_MANAGER') || 
+      hasRole('SALE_STAFF') || 
+      (user?.department && ['SALE', 'SALES'].includes(user.department.toUpperCase()));
 
   // --- ITEM COMPONENT ---
   const MenuLink = ({ to, icon, label }: { to: string; icon: string; label: string }) => (
@@ -77,6 +89,14 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
           
           <MenuLink to="/profile" icon="bi-person-gear" label="My Profile" />
 
+          {/* [MỚI] SECTION CHO SALES & CRM */}
+          {isSales && (
+            <>
+              <SectionTitle label="Sales & CRM" />
+              <MenuLink to="/crm" icon="bi-graph-up-arrow" label="Deals Pipeline" />
+            </>
+          )}
+
           {isManager && (
             <>
               <SectionTitle label="Management" />
@@ -90,7 +110,7 @@ export default function Sidebar({ variant = 'static' }: { variant?: Variant }) {
                 <SectionTitle label="System" />
                 <MenuLink to="/admin/users" icon="bi-people-fill" label="Employees" />
                 
-                {/* [MỚI] Link cấu hình Workflow */}
+                {/* Link cấu hình Workflow */}
                 <MenuLink to="/admin/workflows" icon="bi-diagram-3-fill" label="Approval Workflows" />
                 
                 <MenuLink to="/admin/settings" icon="bi-gear-fill" label="Settings" />
