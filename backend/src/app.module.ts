@@ -13,6 +13,7 @@ import { AiModule } from './ai/ai.module';
 import { MailModule } from './mail/mail.module';
 import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
 import { WorkflowsModule } from './workflows/workflows.module'; // [MỚI] Import
+import { CrmModule } from './crm/crm.module';
 
 @Module({
   imports: [
@@ -44,7 +45,8 @@ import { WorkflowsModule } from './workflows/workflows.module'; // [MỚI] Impor
     RequestsModule,
     CatalogModule,
     AiModule,
-    WorkflowsModule, // [MỚI] Bắt buộc phải có dòng này API mới chạy được
+    WorkflowsModule, 
+    CrmModule,
   ],
 })
 export class AppModule {

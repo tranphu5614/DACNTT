@@ -7,6 +7,7 @@ export enum Role {
   MANAGER = 'MANAGER',
   IT_MANAGER = 'IT_MANAGER',
   HR_MANAGER = 'HR_MANAGER',
+  SALE_MANAGER = 'SALES_MANAGER', // [CHỈ CẦN ROLE NÀY]
 }
 
 @Schema({ timestamps: true })
@@ -44,7 +45,6 @@ export class User {
   @Prop()
   resetPasswordExpires?: Date;
 
-  // [MỚI] Số ngày nghỉ phép có lương còn lại (Mặc định 12/năm)
   @Prop({ default: 12 })
   paidLeaveDaysLeft!: number;
 }

@@ -22,10 +22,32 @@ import RequestDetail from './pages/RequestDetail';
 import Dashboard from './pages/Dashboard';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import WorkflowConfigPage from './pages/WorkflowConfigPage'; // [MỚI] Import trang cấu hình
+import WorkflowConfigPage from './pages/WorkflowConfigPage';
+
+// CRM Pages
+import CrmPage from './pages/CrmPage';
+import CrmDetailPage from './pages/CrmDetailPage';
+import PublicContactPage from './pages/PublicContactPage';
 
 // Components
 import Chatbot from './components/Chatbot';
+
+// --- [MỚI] COMPONENT BẢO VỆ RIÊNG CHO SALES ---
+// Cho phép truy cập nếu là Admin/Manager HOẶC nhân viên thuộc phòng ban SALE/SALES
+const RequireSales = ({ children }: { children: JSX.Element }) => {
+  const { user, hasRole } = useAuth();
+
+  const canAccess = 
+    hasRole('ADMIN') || 
+    hasRole('SALE_MANAGER') || 
+    hasRole('SALE_STAFF') || 
+    (user?.department && ['SALE', 'SALES'].includes(user.department.toUpperCase()));
+
+  if (!canAccess) {
+    return <Navigate to="/profile" replace />;
+  }
+  return children;
+};
 
 // --- LAYOUT CON ---
 const AuthLayout = () => {
@@ -41,10 +63,13 @@ const AuthLayout = () => {
 export default function App() {
   const { token, user, logout } = useAuth();
 
-  // Chưa đăng nhập
+  // 1. CHƯA ĐĂNG NHẬP
   if (!token) {
     return (
       <Routes>
+        {/* Route Public cho khách hàng */}
+        <Route path="/contact-us" element={<PublicContactPage />} />
+
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -58,7 +83,7 @@ export default function App() {
     );
   }
 
-  // Đã đăng nhập
+  // 2. ĐÃ ĐĂNG NHẬP
   return (
     <div className="d-flex flex-column min-vh-100 bg-light">
       {/* Navbar Top */}
@@ -96,6 +121,9 @@ export default function App() {
         <div className="flex-grow-1 p-4 overflow-auto" style={{ height: 'calc(100vh - 60px)' }}>
           <Routes>
             <Route path="/verify-email" element={<VerifyEmailPage />} />
+            
+            {/* Route này để user login rồi vẫn xem được trang contact (để test) */}
+            <Route path="/contact-us" element={<PublicContactPage />} />
 
             <Route element={<ProtectedRoute />}>
               <Route path="/profile" element={<ProfilePage />} />
@@ -105,6 +133,25 @@ export default function App() {
               
               <Route path="/requests/pending" element={<RequestsToApprove />} />
               <Route path="/requests/:id" element={<RequestDetail />} />
+              
+              {/* [CẬP NHẬT] Sử dụng RequireSales thay vì RequireRoles */}
+              <Route 
+                 path="/crm" 
+                 element={
+                    <RequireSales>
+                        <CrmPage />
+                    </RequireSales>
+                 } 
+              />
+              
+              <Route 
+                 path="/crm/:id" 
+                 element={
+                    <RequireSales>
+                        <CrmDetailPage />
+                    </RequireSales>
+                 } 
+              />
               
               <Route 
                 path="/dashboard" 
@@ -124,7 +171,6 @@ export default function App() {
             <Route path="/admin/users/create" element={<RequireAdmin><AdminUsersPage /></RequireAdmin>} />
             <Route path="/admin/users/:id" element={<RequireAdmin><UserDetailPage /></RequireAdmin>} />
             
-            {/* [MỚI] Route cấu hình Workflow */}
             <Route path="/admin/workflows" element={<RequireAdmin><WorkflowConfigPage /></RequireAdmin>} />
 
             <Route path="/" element={<Navigate to="/profile" replace />} />

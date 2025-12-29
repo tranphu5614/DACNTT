@@ -213,14 +213,15 @@ export class UsersService {
     return this.userModel.findById(id).select('-password').exec();
   }
 
+  // [QUAN TRỌNG] Tìm user theo phòng ban (kể cả nhân viên & quản lý)
   async findByDepartment(dept: string) {
     if (!dept) return [];
     const department = dept.toUpperCase();
     return this.userModel
       .find({
         $or: [
-          { department: department },
-          { roles: { $in: [department, `${department}_MANAGER`] } }
+          { department: department }, // Tìm nhân viên thuộc phòng ban
+          { roles: { $in: [department, `${department}_MANAGER`] } } // Tìm Manager của phòng ban
         ]
       })
       .select('_id name email department roles')
@@ -251,6 +252,7 @@ export class UsersService {
       user.department = dto.department.toUpperCase();
     }
 
+    // Logic cấp quyền Manager theo phòng ban
     if (dto.isManager !== undefined) {
       const dept = user.department; 
       
@@ -263,8 +265,11 @@ export class UsersService {
         roles.push(Role.MANAGER);
         const specificRole = `${dept}_MANAGER`;
         
-        if (!roles.includes(specificRole as Role)) {
-          roles.push(specificRole as Role);
+        // Nếu role đó tồn tại trong Enum thì mới thêm
+        if (Object.values(Role).includes(specificRole as Role)) {
+             if (!roles.includes(specificRole as Role)) {
+                roles.push(specificRole as Role);
+             }
         }
       }
 
