@@ -3,7 +3,7 @@ import { submitPublicRequest } from '../api/crm';
 import { Link } from 'react-router-dom';
 
 // =============================================================================
-// 1. CÁC COMPONENT TĨNH (Đưa ra ngoài để không bị render lại)
+// 1. STATIC COMPONENTS (Moved outside to prevent re-renders)
 // =============================================================================
 
 const Navbar = () => (
@@ -18,13 +18,13 @@ const Navbar = () => (
       </button>
       <div className="collapse navbar-collapse justify-content-end" id="navbarNav">
         <ul className="navbar-nav gap-3 align-items-center">
-          <li className="nav-item"><a className="nav-link text-white" href="#features">Giải pháp</a></li>
-          <li className="nav-item"><a className="nav-link text-white" href="#about">Về chúng tôi</a></li>
+          <li className="nav-item"><a className="nav-link text-white" href="#features">Solutions</a></li>
+          <li className="nav-item"><a className="nav-link text-white" href="#about">About Us</a></li>
           <li className="nav-item">
-            <a href="#contact" className="btn btn-primary px-4 rounded-pill">Liên hệ ngay</a>
+            <a href="#contact" className="btn btn-primary px-4 rounded-pill">Contact Now</a>
           </li>
           <li className="nav-item border-start ps-3 ms-2 border-secondary">
-             <Link to="/login" className="nav-link text-warning fw-bold">Nội bộ Login</Link>
+             <Link to="/login" className="nav-link text-warning fw-bold">Employee Login</Link>
           </li>
         </ul>
       </div>
@@ -40,14 +40,14 @@ const HeroSection = () => (
       <div className="container py-5 position-relative z-1">
           <div className="row align-items-center g-5">
               <div className="col-lg-6">
-                  <h1 className="display-4 fw-bold mb-4">Chuyển đổi số toàn diện cho doanh nghiệp của bạn</h1>
+                  <h1 className="display-4 fw-bold mb-4">Comprehensive Digital Transformation for Your Business</h1>
                   <p className="lead text-white-50 mb-4">
-                      Hệ thống ERP, CRM và Quản trị nhân sự tích hợp AI giúp tối ưu hóa quy trình, 
-                      nâng cao hiệu suất làm việc và tăng trưởng doanh thu vượt bậc.
+                      AI-integrated ERP, CRM, and HR management systems to optimize processes, 
+                      boost productivity, and drive exponential revenue growth.
                   </p>
                   <div className="d-flex gap-3">
-                      <a href="#contact" className="btn btn-primary btn-lg rounded-pill px-5">Tư vấn miễn phí</a>
-                      <a href="#features" className="btn btn-outline-light btn-lg rounded-pill px-5">Tìm hiểu thêm</a>
+                      <a href="#contact" className="btn btn-primary btn-lg rounded-pill px-5">Free Consultation</a>
+                      <a href="#features" className="btn btn-outline-light btn-lg rounded-pill px-5">Learn More</a>
                   </div>
               </div>
               <div className="col-lg-6 text-center">
@@ -66,29 +66,29 @@ const FeaturesSection = () => (
   <section id="features" className="py-5 bg-light">
       <div className="container py-5">
           <div className="text-center mb-5">
-              <h2 className="fw-bold">Tại sao chọn chúng tôi?</h2>
-              <p className="text-muted">Giải pháp công nghệ tiên tiến được tin dùng bởi 500+ doanh nghiệp</p>
+              <h2 className="fw-bold">Why Choose Us?</h2>
+              <p className="text-muted">Advanced technology solutions trusted by 500+ enterprises</p>
           </div>
           <div className="row g-4">
               <div className="col-md-4">
                   <div className="card h-100 border-0 shadow-sm p-4 text-center hover-shadow transition">
                       <div className="mb-3 text-primary"><i className="bi bi-cpu fs-1"></i></div>
-                      <h4 className="fw-bold">Tích hợp AI</h4>
-                      <p className="text-muted">Tự động phân loại yêu cầu, gợi ý giải pháp và hỗ trợ ra quyết định thông minh với Google Gemini.</p>
+                      <h4 className="fw-bold">AI Integration</h4>
+                      <p className="text-muted">Auto-categorize requests, suggest solutions, and support smart decision-making with Google Gemini.</p>
                   </div>
               </div>
               <div className="col-md-4">
                   <div className="card h-100 border-0 shadow-sm p-4 text-center">
                       <div className="mb-3 text-success"><i className="bi bi-graph-up-arrow fs-1"></i></div>
-                      <h4 className="fw-bold">Quản lý CRM</h4>
-                      <p className="text-muted">Theo dõi hành trình khách hàng, quản lý Sales Pipeline và tối ưu tỷ lệ chốt đơn (Win Rate).</p>
+                      <h4 className="fw-bold">CRM Management</h4>
+                      <p className="text-muted">Track customer journeys, manage Sales Pipelines, and optimize Win Rates effectively.</p>
                   </div>
               </div>
               <div className="col-md-4">
                   <div className="card h-100 border-0 shadow-sm p-4 text-center">
                       <div className="mb-3 text-warning"><i className="bi bi-people-fill fs-1"></i></div>
-                      <h4 className="fw-bold">Nhân sự & Quy trình</h4>
-                      <p className="text-muted">Số hóa quy trình duyệt đơn từ, quản lý nhân sự và đánh giá KPI minh bạch, hiệu quả.</p>
+                      <h4 className="fw-bold">HR & Processes</h4>
+                      <p className="text-muted">Digitize approval workflows, manage personnel, and evaluate KPIs transparently and efficiently.</p>
                   </div>
               </div>
           </div>
@@ -106,11 +106,11 @@ const Footer = () => (
 );
 
 // =============================================================================
-// 2. MAIN COMPONENT (Chứa Logic và State)
+// 2. MAIN COMPONENT (Logic and State)
 // =============================================================================
 
 const PublicContactPage = () => {
-  // --- STATE QUẢN LÝ FORM ---
+  // --- FORM STATE MANAGEMENT ---
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -120,7 +120,7 @@ const PublicContactPage = () => {
   });
   const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
 
-  // --- XỬ LÝ GỬI FORM ---
+  // --- SUBMIT HANDLER ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('LOADING');
@@ -140,22 +140,22 @@ const PublicContactPage = () => {
       <HeroSection />
       <FeaturesSection />
       
-      {/* --- PHẦN CONTACT FORM (Viết trực tiếp ở đây để giữ Focus khi gõ) --- */}
+      {/* --- CONTACT FORM SECTION (Kept here to maintain focus while typing) --- */}
       <section id="contact" className="py-5">
         <div className="container py-5">
             <div className="row g-5 align-items-center">
                 {/* Contact Info */}
                 <div className="col-lg-5">
-                    <h2 className="fw-bold mb-4">Liên hệ hợp tác</h2>
-                    <p className="lead mb-4">Để lại thông tin, chuyên viên tư vấn của chúng tôi sẽ liên hệ lại trong vòng 30 phút.</p>
+                    <h2 className="fw-bold mb-4">Partnership Contact</h2>
+                    <p className="lead mb-4">Leave your details, and our consultants will contact you within 30 minutes.</p>
                     
                     <div className="d-flex mb-3">
                         <div className="flex-shrink-0 btn-lg-square bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style={{width: 50, height: 50}}>
                             <i className="bi bi-geo-alt-fill"></i>
                         </div>
                         <div className="ms-3">
-                            <h5 className="mb-0">Địa chỉ</h5>
-                            <p className="text-muted">Tòa nhà TechBuilding, Hà Nội, Việt Nam</p>
+                            <h5 className="mb-0">Address</h5>
+                            <p className="text-muted">TechBuilding Tower, Hanoi, Vietnam</p>
                         </div>
                     </div>
                     <div className="d-flex mb-3">
@@ -185,26 +185,26 @@ const PublicContactPage = () => {
                             {status === 'SUCCESS' ? (
                                 <div className="text-center py-5">
                                     <div className="mb-3 text-success"><i className="bi bi-check-circle-fill fs-1"></i></div>
-                                    <h3 className="fw-bold text-success">Gửi yêu cầu thành công!</h3>
-                                    <p className="text-muted">Cảm ơn bạn đã quan tâm. Đội ngũ Sale sẽ liên hệ với bạn sớm nhất.</p>
-                                    <button className="btn btn-outline-primary mt-3" onClick={() => setStatus('IDLE')}>Gửi yêu cầu khác</button>
+                                    <h3 className="fw-bold text-success">Request Sent Successfully!</h3>
+                                    <p className="text-muted">Thank you for your interest. Our Sales team will contact you shortly.</p>
+                                    <button className="btn btn-outline-primary mt-3" onClick={() => setStatus('IDLE')}>Send Another Request</button>
                                 </div>
                             ) : (
                                 <form onSubmit={handleSubmit}>
-                                    <h3 className="fw-bold mb-4 text-center">Đăng ký tư vấn</h3>
-                                    {status === 'ERROR' && <div className="alert alert-danger">Có lỗi xảy ra, vui lòng thử lại!</div>}
+                                    <h3 className="fw-bold mb-4 text-center">Get a Consultation</h3>
+                                    {status === 'ERROR' && <div className="alert alert-danger">An error occurred, please try again!</div>}
                                     
                                     <div className="row g-3">
                                         <div className="col-md-6">
-                                            <label className="form-label fw-bold">Họ và Tên <span className="text-danger">*</span></label>
+                                            <label className="form-label fw-bold">Full Name <span className="text-danger">*</span></label>
                                             <input 
-                                                type="text" className="form-control form-control-lg bg-light" placeholder="Nguyễn Văn A" required
+                                                type="text" className="form-control form-control-lg bg-light" placeholder="John Doe" required
                                                 value={form.fullName} 
                                                 onChange={e => setForm({...form, fullName: e.target.value})}
                                             />
                                         </div>
                                         <div className="col-md-6">
-                                            <label className="form-label fw-bold">Số điện thoại <span className="text-danger">*</span></label>
+                                            <label className="form-label fw-bold">Phone Number <span className="text-danger">*</span></label>
                                             <input 
                                                 type="text" className="form-control form-control-lg bg-light" placeholder="0909..." required
                                                 value={form.phoneNumber} 
@@ -212,7 +212,7 @@ const PublicContactPage = () => {
                                             />
                                         </div>
                                         <div className="col-12">
-                                            <label className="form-label fw-bold">Email công việc <span className="text-danger">*</span></label>
+                                            <label className="form-label fw-bold">Work Email <span className="text-danger">*</span></label>
                                             <input 
                                                 type="email" className="form-control form-control-lg bg-light" placeholder="name@company.com" required
                                                 value={form.email} 
@@ -220,18 +220,18 @@ const PublicContactPage = () => {
                                             />
                                         </div>
                                         <div className="col-12">
-                                            <label className="form-label fw-bold">Tên công ty</label>
+                                            <label className="form-label fw-bold">Company Name</label>
                                             <input 
-                                                type="text" className="form-control form-control-lg bg-light" placeholder="Công ty TNHH..."
+                                                type="text" className="form-control form-control-lg bg-light" placeholder="TechSolutions Ltd..."
                                                 value={form.companyName} 
                                                 onChange={e => setForm({...form, companyName: e.target.value})}
                                             />
                                         </div>
                                         <div className="col-12">
-                                            <label className="form-label fw-bold">Nhu cầu chi tiết</label>
+                                            <label className="form-label fw-bold">Detailed Requirements</label>
                                             <textarea 
                                                 className="form-control form-control-lg bg-light" rows={4} 
-                                                placeholder="Tôi cần tư vấn về..." required
+                                                placeholder="I need advice on..." required
                                                 value={form.requirement} 
                                                 onChange={e => setForm({...form, requirement: e.target.value})}
                                             ></textarea>
@@ -243,8 +243,8 @@ const PublicContactPage = () => {
                                                 disabled={status === 'LOADING'}
                                             >
                                                 {status === 'LOADING' ? (
-                                                    <span><span className="spinner-border spinner-border-sm me-2"></span>Đang gửi...</span>
-                                                ) : 'Gửi Yêu Cầu Tư Vấn'}
+                                                    <span><span className="spinner-border spinner-border-sm me-2"></span>Sending...</span>
+                                                ) : 'Submit Request'}
                                             </button>
                                         </div>
                                     </div>
