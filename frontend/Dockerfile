@@ -1,24 +1,28 @@
 # --- Stage 1: Build ---
 FROM node:20-alpine as builder
+
+# Nhận biến từ Render truyền vào lúc build (Build-time)
+ARG VITE_API_URL
+
+# Gán vào ENV để câu lệnh npm run build có thể đọc được
+ENV VITE_API_URL=$VITE_API_URL
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+
+# Vite sẽ tìm thấy ENV VITE_API_URL và nhúng vào file dist
 RUN npm run build
 
 # --- Stage 2: Serve bằng Nginx ---
 FROM nginx:alpine
 
-# 1. THAY ĐỔI: Copy vào thư mục templates thay vì conf.d trực tiếp
-# Nginx Docker image sẽ tự động dùng envsubst để thay thế biến môi trường
-# sau đó mới xuất file thực tế vào /etc/nginx/conf.d/default.conf
+# Copy cấu hình template để xử lý biến BACKEND_URL (Runtime)
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Copy file build từ stage trước
+# Copy file tĩnh đã được nhúng URL API từ stage builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
-
-# 2. THAY ĐỔI: Xóa dòng CMD cũ
-# Image nginx:alpine mặc định đã có script chạy envsubst và khởi động nginx rồi.
-# Nếu bạn ghi đè CMD như cũ, script envsubst sẽ không được chạy.
+# Không dùng CMD để mặc định Nginx tự chạy script envsubst
