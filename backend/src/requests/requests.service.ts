@@ -10,7 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as ExcelJS from 'exceljs';
-// ✅ THAY ĐỔI: Sử dụng MailService của chúng ta thay vì MailerService cũ
+// ✅ THAY ĐỔI: Import MailService (Brevo API)
 import { MailService } from '../mail/mail.service'; 
 import { Request as RequestEntity, RequestDocument, RequestStatus } from './schemas/request.schema';
 import { ROOMS, RoomSize } from './rooms.constants';
@@ -30,7 +30,7 @@ export class RequestsService {
     @InjectModel(RequestEntity.name)
     private readonly requestModel: Model<RequestDocument>,
     private readonly priorityClassifier: PriorityClassifierService,
-    // ✅ THAY ĐỔI: Đổi kiểu dữ liệu từ MailerService sang MailService
+    // ✅ THAY ĐỔI: Inject MailService mới (Thay cho MailerService cũ)
     private readonly mailService: MailService, 
     private readonly usersService: UsersService,
     private readonly workflowsService: WorkflowsService,
@@ -68,16 +68,16 @@ export class RequestsService {
     try {
       const email = toUser?.email || (typeof toUser === 'string' ? toUser : null);
       if (email) {
-        // ✅ THAY ĐỔI: Sử dụng MailService mới với cấu trúc 3 tham số (to, subject, content)
+        // ✅ THAY ĐỔI: Gọi hàm sendMail với 3 tham số rời (to, subject, content)
         await this.mailService.sendMail(
           email,
           subject,
           htmlContent,
         );
-        this.logger.log(`Email sent via Resend API to ${email}`);
+        this.logger.log(`Notification email sent to ${email}`);
       }
     } catch (error) {
-      this.logger.error('Lỗi gửi mail thông báo qua API:', error);
+      this.logger.error('Lỗi gửi mail thông báo:', error);
     }
   }
 
@@ -151,6 +151,7 @@ export class RequestsService {
       try { dto.custom = JSON.parse(dto.custom); } catch { dto.custom = {}; }
     }
 
+    // --- XỬ LÝ NGHỈ PHÉP (LEAVE REQUEST) ---
     if (dto.typeKey === 'leave_request') {
         const { leaveType, fromDate, toDate } = dto.custom || {};
         
@@ -192,7 +193,9 @@ export class RequestsService {
       }
     }
 
+    // --- [LOGIC MỚI QUAN TRỌNG] Lấy quy trình duyệt (Workflow) ---
     let approvalsFromCatalog = [];
+
     const dbWorkflow = await this.workflowsService.findByType(dto.typeKey);
     
     if (dbWorkflow && dbWorkflow.steps.length > 0) {
