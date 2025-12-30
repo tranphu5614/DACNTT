@@ -6,19 +6,33 @@ import { ConfigService } from '@nestjs/config';
 @Module({
   imports: [
     MailerModule.forRootAsync({
-      useFactory: async (config: ConfigService) => ({
-        transport: {
-          host: config.get('MAIL_HOST'),
-          secure: false,
-          auth: {
-            user: config.get('MAIL_USER'),
-            pass: config.get('MAIL_PASSWORD'),
+      useFactory: async (config: ConfigService) => {
+        // Tự động xác định secure dựa trên PORT hoặc biến môi trường
+        const port = config.get<number>('MAIL_PORT') || 587;
+        const isSecure = port === 465; 
+
+        return {
+          transport: {
+            host: config.get('MAIL_HOST'),
+            port: port,
+            secure: isSecure, 
+            auth: {
+              user: config.get('MAIL_USER'),
+              pass: config.get('MAIL_PASSWORD'),
+            },
+            tls: {
+              // Giúp chạy mượt trên Render và không gây lỗi ở Local
+              rejectUnauthorized: false,
+            },
+            // Tăng thời gian chờ để ổn định trên môi trường Cloud
+            connectionTimeout: 15000,
+            greetingTimeout: 15000,
           },
-        },
-        defaults: {
-          from: config.get('MAIL_FROM'),
-        },
-      }),
+          defaults: {
+            from: config.get('MAIL_FROM'),
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
