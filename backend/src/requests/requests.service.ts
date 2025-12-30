@@ -10,14 +10,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as ExcelJS from 'exceljs';
-import { MailerService } from '@nestjs-modules/mailer';
+// ✅ THAY ĐỔI: Sử dụng MailService của chúng ta thay vì MailerService cũ
+import { MailService } from '../mail/mail.service'; 
 import { Request as RequestEntity, RequestDocument, RequestStatus } from './schemas/request.schema';
 import { ROOMS, RoomSize } from './rooms.constants';
 import { DEFAULT_CATALOG } from '../catalog/catalog.data';
 import { ERROR_SUGGESTIONS } from './suggestions.data';
 import { PriorityClassifierService } from '../ai/priority-classifier.service';
 import { UsersService } from '../users/users.service';
-import { WorkflowsService } from '../workflows/workflows.service'; // [MỚI] Import Service Workflow
+import { WorkflowsService } from '../workflows/workflows.service';
 
 type BusyDoc = { bookingRoomKey?: string };
 
@@ -29,9 +30,10 @@ export class RequestsService {
     @InjectModel(RequestEntity.name)
     private readonly requestModel: Model<RequestDocument>,
     private readonly priorityClassifier: PriorityClassifierService,
-    private readonly mailerService: MailerService,
+    // ✅ THAY ĐỔI: Đổi kiểu dữ liệu từ MailerService sang MailService
+    private readonly mailService: MailService, 
     private readonly usersService: UsersService,
-    private readonly workflowsService: WorkflowsService, // [MỚI] Inject vào đây
+    private readonly workflowsService: WorkflowsService,
   ) {}
 
   private getCatalogByTypeKey(typeKey: string) {
@@ -51,7 +53,6 @@ export class RequestsService {
 
     while (cur <= last) {
       const dayOfWeek = cur.getDay();
-      // 0: Chủ Nhật, 6: Thứ 7 -> Chỉ đếm từ Thứ 2 (1) đến Thứ 6 (5)
       if (dayOfWeek !== 0 && dayOfWeek !== 6) {
         count++;
       }
@@ -61,21 +62,22 @@ export class RequestsService {
   }
 
   // ==================================================================
-  // HELPER: GỬI EMAIL THÔNG BÁO
+  // HELPER: GỬI EMAIL THÔNG BÁO (ĐÃ CẬP NHẬT)
   // ==================================================================
   private async sendNotificationEmail(toUser: any, subject: string, htmlContent: string) {
     try {
       const email = toUser?.email || (typeof toUser === 'string' ? toUser : null);
       if (email) {
-        await this.mailerService.sendMail({
-          to: email,
-          subject: subject,
-          html: htmlContent,
-        });
-        this.logger.log(`Email sent to ${email}`);
+        // ✅ THAY ĐỔI: Sử dụng MailService mới với cấu trúc 3 tham số (to, subject, content)
+        await this.mailService.sendMail(
+          email,
+          subject,
+          htmlContent,
+        );
+        this.logger.log(`Email sent via Resend API to ${email}`);
       }
     } catch (error) {
-      this.logger.error('Lỗi gửi mail thông báo:', error);
+      this.logger.error('Lỗi gửi mail thông báo qua API:', error);
     }
   }
 
@@ -149,7 +151,6 @@ export class RequestsService {
       try { dto.custom = JSON.parse(dto.custom); } catch { dto.custom = {}; }
     }
 
-    // --- XỬ LÝ NGHỈ PHÉP (LEAVE REQUEST) ---
     if (dto.typeKey === 'leave_request') {
         const { leaveType, fromDate, toDate } = dto.custom || {};
         
@@ -179,7 +180,6 @@ export class RequestsService {
             await this.usersService.updateLeaveDays(requesterId, currentBalance - daysRequested);
         }
     }
-    // ----------------------------------------------------
 
     if (!dto.priority) {
       const textParts = [dto.title, dto.description].filter(Boolean);
@@ -192,22 +192,17 @@ export class RequestsService {
       }
     }
 
-    // --- [LOGIC MỚI QUAN TRỌNG] Lấy quy trình duyệt (Workflow) ---
     let approvalsFromCatalog = [];
-
-    // B1: Tìm trong Database (Ưu tiên cấu hình động)
     const dbWorkflow = await this.workflowsService.findByType(dto.typeKey);
     
     if (dbWorkflow && dbWorkflow.steps.length > 0) {
        approvalsFromCatalog = dbWorkflow.steps.map(s => ({ level: s.level, role: s.role }));
     } else {
-       // B2: Nếu không có trong DB, lấy từ file cứng (Catalog mặc định)
        const catalog = dto?.typeKey ? this.getCatalogByTypeKey(dto.typeKey) : null;
        approvalsFromCatalog = catalog?.approvalFlow?.map((s) => ({ level: s.level, role: s.role })) || [];
     }
 
     const hasApproval = approvalsFromCatalog.length > 0;
-    // -------------------------------------------------------------
 
     if (dto?.typeKey === 'meeting_room_booking') {
       const c = dto.custom || {};
@@ -260,7 +255,7 @@ export class RequestsService {
       bookingEnd: dto.bookingEnd,
       requester: new Types.ObjectId(requesterId),
       attachments,
-      approvals: approvalsFromCatalog, // Đã được gán từ DB hoặc Catalog
+      approvals: approvalsFromCatalog, 
       currentApprovalLevel: 0,
       approvalStatus: hasApproval ? 'PENDING' : 'NONE',
       assignedTo: null,
@@ -287,7 +282,6 @@ export class RequestsService {
     return { items, total, page: p, limit: l };
   }
 
-  // Lấy danh sách ticket ĐƯỢC GIAO cho user hiện tại
   async listAssigned(userId: string, page = 1, limit = 10) {
     const uid = new Types.ObjectId(String(userId));
     const p = Math.max(1, Math.floor(page));
