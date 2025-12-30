@@ -44,6 +44,7 @@ services:
       - backend
     environment:
       - VITE_API_URL=${VITE_API_URL}
+      - BACKEND_URL=${BACKEND_URL}
 
 volumes:
   mongo_data:

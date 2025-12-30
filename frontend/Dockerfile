@@ -1,27 +1,24 @@
-# frontend/Dockerfile
-
 # --- Stage 1: Build ---
 FROM node:20-alpine as builder
-
 WORKDIR /app
-
 COPY package*.json ./
 RUN npm install
-
 COPY . .
-
-# Build React app ra thư mục dist
 RUN npm run build
 
 # --- Stage 2: Serve bằng Nginx ---
 FROM nginx:alpine
 
-# Copy file build từ stage trước vào thư mục serve của Nginx
-COPY --from=builder /app/dist /usr/share/nginx/html
+# 1. THAY ĐỔI: Copy vào thư mục templates thay vì conf.d trực tiếp
+# Nginx Docker image sẽ tự động dùng envsubst để thay thế biến môi trường
+# sau đó mới xuất file thực tế vào /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# (Tùy chọn) Copy cấu hình nginx tùy chỉnh để hỗ trợ React Router
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy file build từ stage trước
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+# 2. THAY ĐỔI: Xóa dòng CMD cũ
+# Image nginx:alpine mặc định đã có script chạy envsubst và khởi động nginx rồi.
+# Nếu bạn ghi đè CMD như cũ, script envsubst sẽ không được chạy.
