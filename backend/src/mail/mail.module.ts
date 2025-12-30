@@ -6,37 +6,28 @@ import { ConfigService } from '@nestjs/config';
 @Module({
   imports: [
     MailerModule.forRootAsync({
-      useFactory: async (config: ConfigService) => {
-        const port = Number(config.get('MAIL_PORT')) || 465;
-        // Ép secure là true nếu dùng cổng 465, Google SMTP yêu cầu SSL ngay từ đầu ở cổng này
-        const isSecure = port === 465;
-
-        return {
-          transport: {
-            host: config.get('MAIL_HOST') || 'smtp.gmail.com',
-            port: port,
-            secure: isSecure,
-            auth: {
-              user: config.get('MAIL_USER'),
-              // Tự động xóa khoảng trắng để tránh lỗi copy-paste từ Google
-              pass: config.get('MAIL_PASSWORD')?.replace(/\s/g, ''),
-            },
-            tls: {
-              // Quan trọng nhất cho Cloud: Bỏ qua kiểm tra chứng chỉ nghiêm ngặt của Proxy
-              rejectUnauthorized: false,
-              // Buộc sử dụng TLS 1.2 trở lên để tránh lỗi handshake cũ
-              minVersion: 'TLSv1.2'
-            },
-            // Tăng Timeout lên mức cực đại (30 giây) để bù đắp độ trễ của Render Free
-            connectionTimeout: 30000,
-            greetingTimeout: 30000,
-            socketTimeout: 30000,
+      useFactory: async (config: ConfigService) => ({
+        transport: {
+          host: config.get('MAIL_HOST') || 'smtp.gmail.com',
+          port: 465,
+          secure: true, // Chạy cổng 465 bắt buộc secure: true
+          auth: {
+            user: config.get('MAIL_USER'),
+            pass: config.get('MAIL_PASSWORD')?.replace(/\s/g, ''),
           },
-          defaults: {
-            from: config.get('MAIL_FROM'),
+          // THÊM PHẦN NÀY ĐỂ FIX TIMEOUT TRÊN CLOUD
+          connectionTimeout: 30000,
+          greetingTimeout: 30000,
+          socketTimeout: 30000,
+          dnsV6Order: false, // Ép ưu tiên IPv4 để tránh lỗi nghẽn IPv6 trên Render
+          tls: {
+            rejectUnauthorized: false, // Bỏ qua lỗi chứng chỉ Proxy
           },
-        };
-      },
+        },
+        defaults: {
+          from: config.get('MAIL_FROM'),
+        },
+      }),
       inject: [ConfigService],
     }),
   ],
