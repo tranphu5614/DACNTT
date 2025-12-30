@@ -10,7 +10,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types, FilterQuery } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { MailerService } from '@nestjs-modules/mailer';
+// 👇 1. Thay đổi Import: Bỏ MailerService, thêm MailService
+import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 
 import { CreateUserDto } from './dto/create-user.dto';
@@ -22,7 +23,8 @@ import { ListUsersQueryDto } from './dto/list-users.query';
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    private readonly mailerService: MailerService,
+    // 👇 2. Thay đổi Constructor: Inject MailService
+    private readonly mailService: MailService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -79,17 +81,18 @@ export class UsersService {
     const link = `${frontendUrl}/verify-email?token=${verificationToken}`;
 
     try {
-      await this.mailerService.sendMail({
-        to: doc.email,
-        subject: '[Hệ thống] Mời kích hoạt tài khoản & Đặt mật khẩu',
-        html: `
+      // 👇 3. Sửa tham số gửi mail: (to, subject, html)
+      await this.mailService.sendMail(
+        doc.email,
+        '[Hệ thống] Mời kích hoạt tài khoản & Đặt mật khẩu',
+        `
           <h3>Xin chào ${doc.name},</h3>
           <p>Tài khoản của bạn đã được khởi tạo thành công.</p>
           <p>Vui lòng nhấn vào nút bên dưới để thiết lập mật khẩu và kích hoạt tài khoản:</p>
           <a href="${link}" style="padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">ĐẶT MẬT KHẨU & KÍCH HOẠT</a>
           <p>Liên kết này chỉ có hiệu lực một lần.</p>
-        `,
-      });
+        `
+      );
       console.log(`Activation email sent to ${doc.email}`);
     } catch (e) {
       console.error('Error sending activation email:', e);
@@ -148,18 +151,19 @@ export class UsersService {
     const link = `${frontendUrl}/reset-password?token=${token}`;
 
     try {
-      await this.mailerService.sendMail({
-        to: user.email,
-        subject: '[Hệ thống] Yêu cầu đặt lại mật khẩu',
-        html: `
+      // 👇 4. Sửa tham số gửi mail: (to, subject, html)
+      await this.mailService.sendMail(
+        user.email,
+        '[Hệ thống] Yêu cầu đặt lại mật khẩu',
+        `
           <h3>Xin chào ${user.name},</h3>
           <p>Hệ thống nhận được yêu cầu khôi phục mật khẩu cho tài khoản này.</p>
           <p>Nếu là bạn, hãy click vào link bên dưới để đặt lại mật khẩu:</p>
           <a href="${link}" style="padding: 10px 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 5px;">ĐẶT LẠI MẬT KHẨU</a>
           <p>Link này sẽ hết hạn sau 60 phút.</p>
           <p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>
-        `,
-      });
+        `
+      );
       console.log(`Reset password email sent to ${email}`);
     } catch (e) {
       console.error('Error sending forgot password email:', e);

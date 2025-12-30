@@ -10,25 +10,19 @@ import { AuthModule } from './auth/auth.module';
 import { RequestsModule } from './requests/requests.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { AiModule } from './ai/ai.module';
-import { MailModule } from './mail/mail.module';
+import { MailModule } from './mail/mail.module'; // Import MailModule mới
 import { RateLimitMiddleware } from './middleware/rate-limit.middleware';
-import { WorkflowsModule } from './workflows/workflows.module'; // [MỚI] Import
+import { WorkflowsModule } from './workflows/workflows.module'; 
 import { CrmModule } from './crm/crm.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'uploads'), 
       serveRoot: '/uploads',
-      // [FIX] Thêm dòng này để ngăn lỗi ENOENT index.html
-      serveStaticOptions: {
-        index: false, 
-        fallthrough: false,
-      },
+      serveStaticOptions: { index: false, fallthrough: false },
     }),
-
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -38,8 +32,7 @@ import { CrmModule } from './crm/crm.module';
     }),
     ScheduleModule.forRoot(),
     
-    MailModule,
-
+    MailModule, // Đăng ký MailModule Global ở đây
     UsersModule,
     AuthModule,
     RequestsModule,
