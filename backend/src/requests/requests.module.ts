@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common'; // 👈 [QUAN TRỌNG] Thêm forwardRef
 import { MongooseModule } from '@nestjs/mongoose';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -9,7 +9,7 @@ import { Request, RequestSchema } from './schemas/request.schema';
 import { AiModule } from '../ai/ai.module';
 import { UsersModule } from '../users/users.module';
 import { CatalogModule } from '../catalog/catalog.module';
-import { WorkflowsModule } from '../workflows/workflows.module'; // [MỚI 1] Import file này
+import { WorkflowsModule } from '../workflows/workflows.module';
 
 @Module({
   imports: [
@@ -26,10 +26,12 @@ import { WorkflowsModule } from '../workflows/workflows.module'; // [MỚI 1] Im
       }),
     }),
 
-    AiModule,
+    // 👇 [SỬA LẠI] Dùng forwardRef(() => AiModule) thay vì AiModule
+    forwardRef(() => AiModule),
+
     UsersModule,
     CatalogModule,
-    WorkflowsModule // [MỚI 2] Thêm vào đây để RequestsService dùng được
+    WorkflowsModule
   ],
   controllers: [RequestsController],
   providers: [RequestsService],
