@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mongodb:
     image: mongo:6.0
@@ -9,18 +7,24 @@ services:
       - mongo_data:/data/db
     ports:
       - "27017:27017"
+    # Thêm Healthcheck để báo cho các service khác biết khi nào DB thực sự sẵn sàng
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
     container_name: reqsys_backend
     restart: always
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy # Chỉ khởi động backend khi mongodb đã "khỏe"
     ports:
       - "3000:3000"
-    # Dùng environment để ánh xạ các biến từ file .env hoặc từ Render Dashboard
     environment:
-      - PORT=${PORT}
+      - PORT=${PORT:-3000}
       - MONGO_URI=${MONGO_URI}
       - JWT_SECRET=${JWT_SECRET}
       - SEED_ADMIN_EMAIL=${SEED_ADMIN_EMAIL}
@@ -41,7 +45,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started # Frontend chỉ cần backend khởi chạy là được
     environment:
       - VITE_API_URL=${VITE_API_URL}
       - BACKEND_URL=${BACKEND_URL}
