@@ -5,12 +5,13 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  Inject,     // 👈 [1] Bổ sung import Inject
+  forwardRef, // 👈 [2] Bổ sung import forwardRef
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as ExcelJS from 'exceljs';
-// ✅ THAY ĐỔI: Import MailService (Brevo API)
 import { MailService } from '../mail/mail.service'; 
 import { Request as RequestEntity, RequestDocument, RequestStatus } from './schemas/request.schema';
 import { ROOMS, RoomSize } from './rooms.constants';
@@ -29,8 +30,11 @@ export class RequestsService {
   constructor(
     @InjectModel(RequestEntity.name)
     private readonly requestModel: Model<RequestDocument>,
+    
+    // 👇 [3] QUAN TRỌNG: Thêm Inject và forwardRef để gỡ lỗi vòng lặp với AiModule
+    @Inject(forwardRef(() => PriorityClassifierService))
     private readonly priorityClassifier: PriorityClassifierService,
-    // ✅ THAY ĐỔI: Inject MailService mới (Thay cho MailerService cũ)
+
     private readonly mailService: MailService, 
     private readonly usersService: UsersService,
     private readonly workflowsService: WorkflowsService,
@@ -62,13 +66,12 @@ export class RequestsService {
   }
 
   // ==================================================================
-  // HELPER: GỬI EMAIL THÔNG BÁO (ĐÃ CẬP NHẬT)
+  // HELPER: GỬI EMAIL THÔNG BÁO
   // ==================================================================
   private async sendNotificationEmail(toUser: any, subject: string, htmlContent: string) {
     try {
       const email = toUser?.email || (typeof toUser === 'string' ? toUser : null);
       if (email) {
-        // ✅ THAY ĐỔI: Gọi hàm sendMail với 3 tham số rời (to, subject, content)
         await this.mailService.sendMail(
           email,
           subject,
@@ -193,9 +196,7 @@ export class RequestsService {
       }
     }
 
-    // --- [LOGIC MỚI QUAN TRỌNG] Lấy quy trình duyệt (Workflow) ---
     let approvalsFromCatalog = [];
-
     const dbWorkflow = await this.workflowsService.findByType(dto.typeKey);
     
     if (dbWorkflow && dbWorkflow.steps.length > 0) {
